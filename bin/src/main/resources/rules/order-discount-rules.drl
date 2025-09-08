@@ -1,0 +1,22 @@
+package rules;
+
+import model.OrderLine;
+import model.Order;
+import model.Customer;
+import model.Item;
+import model.Discount;
+
+rule "Silver Customers + High Range Order - 10% Discount"
+    salience -1
+    when
+        $o: Order( $lines : orderLines, orderLines.size >= 2, $customer: customer, discount == null )
+        $c: Customer( category == Category.SILVER, this == $customer )
+        forall( OrderLine( this memberOf $lines,  $item : item)
+                Item(this == $item, category == Item.Category.HIGH_RANGE)
+        )
+    then
+        System.out.println("Silver Customers + High Range Order - 10% Discount - fired");
+        $o.setDiscount(new Discount(10.0));
+        update($o);
+end
+
