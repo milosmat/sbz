@@ -31,11 +31,19 @@ public class ModerationService {
             Collection<User> all = userRepo.findAll();
             for (User u : all) ks.insert(u);
 
+            for (ModerationEventsRepository.ReportEvent r : modRepo.getReports()) {
+                ks.insert(r);
+            }
+
+            for (ModerationEventsRepository.BlockEvent b : modRepo.getBlocks()) {
+                ks.insert(b);
+            }
+            
             ks.getAgenda().getAgendaGroup("user-detect").setFocus();
             ks.fireAllRules();
         } finally {
             ks.dispose();
         }
-        return new ArrayList<ModerationEventsRepository.Flagged>(modRepo.getFlagsAndClear());
+        return new ArrayList<>(modRepo.getFlagsAndClear());
     }
 }

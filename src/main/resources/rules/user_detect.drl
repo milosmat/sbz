@@ -1,70 +1,116 @@
 package rules
 
 import model.User;
+import repo.ModerationEventsRepository.ReportEvent;
+import repo.ModerationEventsRepository.BlockEvent;
 
 global repo.UserRepository userRepo;
 global repo.ModerationEventsRepository modRepo;
 
 agenda-group "user-detect"
 
+declare ReportEvent
+    @role( event )
+    @timestamp( ts )
+end
+
+declare BlockEvent
+    @role( event )
+    @timestamp( ts )
+end
+
+
 // R1: > 5 prijava u 24h -> ban objava 24h
 rule "Detect: 5+ reports in 24h -> post ban 24h"
 when
-    $u : User()
-    eval( modRepo.countReportsAgainstUserInHours($u.getId(), 24) > 5 )
+    $u : User( $uid : id )
+    accumulate(
+        $r : ReportEvent( authorId == $uid ) over window:time(24h),
+        $cnt : count($r)
+    )
+    eval( $cnt > 5 )
 then
-    userRepo.suspendPostingHours($u.getId(), 24);
-    modRepo.addFlag($u.getId(), "5+ prijava u 24h -> zabrana objavljivanja 24h", userRepo.postingSuspendedUntil($u.getId()));
+    userRepo.suspendPostingHours($uid, 24);
+    modRepo.addFlag($uid, "5+ prijava u 24h -> zabrana objavljivanja 24h",
+                    userRepo.postingSuspendedUntil($uid));
 end
 
 // R2: > 8 prijava u 48h -> ban objava 48h
 rule "Detect: 8+ reports in 48h -> post ban 48h"
 when
-    $u : User()
-    eval( modRepo.countReportsAgainstUserInHours($u.getId(), 48) > 8 )
+    $u : User( $uid : id )
+    accumulate(
+        $r : ReportEvent( authorId == $uid ) over window:time(48h),
+        $cnt : count($r)
+    )
+    eval( $cnt > 8 )
 then
-    userRepo.suspendPostingHours($u.getId(), 48);
-    modRepo.addFlag($u.getId(), "8+ prijava u 48h -> zabrana objavljivanja 48h", userRepo.postingSuspendedUntil($u.getId()));
+    userRepo.suspendPostingHours($uid, 48);
+    modRepo.addFlag($uid, "8+ prijava u 48h -> zabrana objavljivanja 48h",
+                    userRepo.postingSuspendedUntil($uid));
 end
 
 // R3: > 4 blokiranja u 24h -> ban objava 24h
 rule "Detect: 4+ blocked in 24h -> post ban 24h"
 when
-    $u : User()
-    eval( modRepo.countBlocksAgainstUserInHours($u.getId(), 24) > 4 )
+    $u : User( $uid : id )
+    accumulate(
+        $b : BlockEvent( targetId == $uid ) over window:time(24h),
+        $cnt : count($b)
+    )
+    eval( $cnt > 4 )
 then
-    userRepo.suspendPostingHours($u.getId(), 24);
-    modRepo.addFlag($u.getId(), "4+ puta blokiran u 24h -> zabrana objavljivanja 24h", userRepo.postingSuspendedUntil($u.getId()));
+    userRepo.suspendPostingHours($uid, 24);
+    modRepo.addFlag($uid, "4+ puta blokiran u 24h -> zabrana objavljivanja 24h",
+                    userRepo.postingSuspendedUntil($uid));
 end
 
-// R4: >2 blokiranja u 48h i >4 prijave u 24h -> login ban 48h
-rule "Detect: (2+ blocks /48h) AND (4+ reports /24h) -> login ban 48h"
+// R4: >2 blokiranja u 48h I >4 prijave u 24h -> login ban 48h
+rule "Detect: (2+ blocks/48h) AND (4+ reports/24h) -> login ban 48h"
 when
-    $u : User()
-    eval( modRepo.countBlocksAgainstUserInHours($u.getId(), 48) > 2 )
-    eval( modRepo.countReportsAgainstUserInHours($u.getId(), 24) > 4 )
+    $u : User( $uid : id )
+    accumulate(
+        $b : BlockEvent( targetId == $uid ) over window:time(48h),
+        $cntB : count($b)
+    )
+    eval( $cntB > 2 )
+    accumulate(
+        $r : ReportEvent( authorId == $uid ) over window:time(24h),
+        $cntR : count($r)
+    )
+    eval( $cntR > 4 )
 then
-    userRepo.suspendLoginHours($u.getId(), 48);
-    modRepo.addFlag($u.getId(), "2+ blokiranja/48h i 4+ prijave/24h -> zabrana logovanja 48h", userRepo.loginSuspendedUntil($u.getId()));
+    userRepo.suspendLoginHours($uid, 48);
+    modRepo.addFlag($uid, "2+ blokiranja/48h i 4+ prijave/24h -> zabrana logovanja 48h",
+                    userRepo.loginSuspendedUntil($uid));
 end
 
-
-// R5: 3+ različitih blokiranja u 12h -> post ban 24h
+// R5: 3+ blokiranja u 12h -> post ban 24h
 rule "Detect: 3+ blocks in 12h -> post ban 24h"
 when
-    $u : User()
-    eval( modRepo.countBlocksAgainstUserInHours($u.getId(), 12) > 2 )
+    $u : User( $uid : id )
+    accumulate(
+        $b : BlockEvent( targetId == $uid ) over window:time(12h),
+        $cnt : count($b)
+    )
+    eval( $cnt > 2 )
 then
-    userRepo.suspendPostingHours($u.getId(), 24);
-    modRepo.addFlag($u.getId(), "3+ blokiranja u 12h -> zabrana objavljivanja 24h", userRepo.postingSuspendedUntil($u.getId()));
+    userRepo.suspendPostingHours($uid, 24);
+    modRepo.addFlag($uid, "3+ blokiranja u 12h -> zabrana objavljivanja 24h",
+                    userRepo.postingSuspendedUntil($uid));
 end
 
 // R6: 10+ prijava u 7 dana -> login ban 72h
 rule "Detect: 10+ reports in 7d -> login ban 72h"
 when
-    $u : User()
-    eval( modRepo.countReportsAgainstUserInDays($u.getId(), 7) > 10 )
+    $u : User( $uid : id )
+    accumulate(
+        $r : ReportEvent( authorId == $uid ) over window:time(7d),
+        $cnt : count($r)
+    )
+    eval( $cnt > 10 )
 then
-    userRepo.suspendLoginHours($u.getId(), 72);
-    modRepo.addFlag($u.getId(), "10+ prijava u 7 dana -> zabrana logovanja 72h", userRepo.loginSuspendedUntil($u.getId()));
+    userRepo.suspendLoginHours($uid, 72);
+    modRepo.addFlag($uid, "10+ prijava u 7 dana -> zabrana logovanja 72h",
+                    userRepo.loginSuspendedUntil($uid));
 end

@@ -57,39 +57,6 @@ public class ModerationEventsRepository {
         blocks.add(new BlockEvent(blockerId, targetId, epochMs));
     }
 
-    // === queryji (time-window) ===
-    public int countReportsAgainstUserInHours(String userId, int hours) {
-        long now = System.currentTimeMillis();
-        long from = now - hours * 3600_000L;
-        int c = 0;
-        synchronized (reports) {
-            for (ReportEvent e : reports) {
-                if (userId.equals(e.authorId) && e.ts >= from) c++;
-            }
-        }
-        return c;
-    }
-
-    public int countReportsAgainstUserInDays(String userId, int days) {
-        return countReportsAgainstUserInHours(userId, days * 24);
-    }
-
-    public int countBlocksAgainstUserInHours(String userId, int hours) {
-        long now = System.currentTimeMillis();
-        long from = now - hours * 3600_000L;
-        int c = 0;
-        synchronized (blocks) {
-            for (BlockEvent e : blocks) {
-                if (userId.equals(e.targetId) && e.ts >= from) c++;
-            }
-        }
-        return c;
-    }
-
-    public int countBlocksAgainstUserInDays(String userId, int days) {
-        return countBlocksAgainstUserInHours(userId, days * 24);
-    }
-
     // === flag lista ===
     public void addFlag(String userId, String reason, long until) {
         flags.add(new Flagged(userId, reason, until));
@@ -100,4 +67,18 @@ public class ModerationEventsRepository {
         flags.clear();
         return out;
     }
+    
+    public List<ReportEvent> getReports() {
+        return new ArrayList<>(reports);
+    }
+
+    public List<BlockEvent> getBlocks() {
+        return new ArrayList<>(blocks);
+    }
+    
+    public void clearEvents() {
+        reports.clear();
+        blocks.clear();
+    }
+    
 }
