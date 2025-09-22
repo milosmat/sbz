@@ -1,0 +1,13 @@
+<header class="topbar">
+  <a routerLink="/" class="brand">{{ title() }}</a>
+  <nav>
+    <a routerLink="/">Feed</a>
+    <a routerLink="/friends/search">Prijatelji</a>
+    <a routerLink="/login">Prijava</a>
+    <a routerLink="/register">Registracija</a>
+  </nav>
+</header>
+
+<main class="page">
+  <router-outlet></router-outlet>
+</main>

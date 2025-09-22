@@ -1,0 +1,12 @@
+:root { --pad: 12px; }
+* { box-sizing: border-box; }
+body, html { margin: 0; height: 100%; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--pad) calc(var(--pad) * 2);
+  border-bottom: 1px solid #eee; position: sticky; top: 0; background: #fff; z-index: 10;
+}
+.topbar .brand { font-weight: 700; text-decoration: none; color: inherit; }
+.topbar nav a { margin-left: 12px; text-decoration: none; color: #3f51b5; }
+.page { padding: 16px; }

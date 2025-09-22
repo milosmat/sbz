@@ -1,0 +1,3 @@
+.center { display: grid; place-items: center; height: 100vh; }
+.full { width: 100%; }
+mat-card { width: min(480px, 95vw); }

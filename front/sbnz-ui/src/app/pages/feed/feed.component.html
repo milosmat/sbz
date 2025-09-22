@@ -1,0 +1,7 @@
+<div class="wrap">
+  <app-post-card
+    *ngFor="let p of posts"
+    [post]="p"
+    (liked)="refresh()">
+  </app-post-card>
+</div>

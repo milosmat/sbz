@@ -1,0 +1,23 @@
+<div class="center">
+  <mat-card>
+    <h2>Prijava</h2>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Email</mat-label>
+        <input matInput formControlName="email" type="email" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Lozinka</mat-label>
+        <input matInput formControlName="password" type="password" />
+      </mat-form-field>
+
+      <button mat-raised-button color="primary" class="full" [disabled]="form.invalid">
+        Prijavi se
+      </button>
+
+      <a routerLink="/register">Nemate nalog? Registrujte se</a>
+    </form>
+  </mat-card>
+</div>

@@ -1,0 +1,6 @@
+.search {
+  width: min(720px, 95vw);
+  margin: 16px auto;
+  display: block;
+  padding: 10px;
+}

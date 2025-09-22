@@ -1,0 +1,10 @@
+<input [formControl]="q" placeholder="Pretraži korisnike" class="search" />
+
+<mat-list>
+  <mat-list-item *ngFor="let u of results">
+    <span matListItemTitle>{{ u.firstName }} {{ u.lastName }}</span>
+    <span matListItemLine>{{ u.email }}</span>
+    <button mat-button (click)="add(u.id)">Dodaj prijatelja</button>
+    <button mat-button (click)="block(u.id)">Blokiraj</button>
+  </mat-list-item>
+</mat-list>
