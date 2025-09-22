@@ -1,0 +1,26 @@
+<h2>Označeni korisnici</h2>
+
+<table mat-table [dataSource]="rows" class="mat-elevation-z1" *ngIf="rows.length">
+  <!-- User -->
+  <ng-container matColumnDef="user">
+    <th mat-header-cell *matHeaderCellDef>Korisnik</th>
+    <td mat-cell *matCellDef="let r">{{r.firstName}} {{r.lastName}} ({{r.email}})</td>
+  </ng-container>
+
+  <!-- Reason -->
+  <ng-container matColumnDef="reason">
+    <th mat-header-cell *matHeaderCellDef>Razlog</th>
+    <td mat-cell *matCellDef="let r">{{r.reason}}</td>
+  </ng-container>
+
+  <!-- Until -->
+  <ng-container matColumnDef="until">
+    <th mat-header-cell *matHeaderCellDef>Suspended do</th>
+    <td mat-cell *matCellDef="let r">{{ r.untilMs | date:'short' }}</td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="cols"></tr>
+  <tr mat-row *matRowDef="let row; columns: cols;"></tr>
+</table>
+
+<p *ngIf="!rows.length">Nema flagova u poslednjem periodu.</p>

@@ -4,19 +4,36 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.List;
+import java.util.UUID;
 
 import model.User;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+
+import db.Db;
 import repo.ModerationEventsRepository;
 import repo.UserRepository;
 import service.ModerationService;
 
 public class ModerationDetectTest {
-
-    private void resetAll(ModerationEventsRepository mr) {
+	
+    public void resetAll(ModerationEventsRepository mr) {
         mr.getFlagsAndClear();
         mr.clearEvents(); // NOVO – očisti sve ReportEvent i BlockEvent
+    }
+    
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+        }
+        ModerationEventsRepository.getInstance().clearEvents();
     }
 
     @Test
@@ -35,12 +52,12 @@ public class ModerationDetectTest {
         long now = System.currentTimeMillis();
 
         // 6 prijava u poslednja 24h
-        mr.recordReportAt(a.getId(), r1.getId(), "p1", now - 1_000);
-        mr.recordReportAt(a.getId(), r2.getId(), "p2", now - 2_000);
-        mr.recordReportAt(a.getId(), r3.getId(), "p3", now - 3_000);
-        mr.recordReportAt(a.getId(), r4.getId(), "p4", now - 4_000);
-        mr.recordReportAt(a.getId(), r5.getId(), "p5", now - 5_000);
-        mr.recordReportAt(a.getId(), r5.getId(), "p6", now - 6_000);
+        mr.recordReportAt(a.getId(), r1.getId(), UUID.randomUUID().toString(), now - 1_000);
+        mr.recordReportAt(a.getId(), r2.getId(), UUID.randomUUID().toString(), now - 2_000);
+        mr.recordReportAt(a.getId(), r3.getId(), UUID.randomUUID().toString(), now - 3_000);
+        mr.recordReportAt(a.getId(), r4.getId(), UUID.randomUUID().toString(), now - 4_000);
+        mr.recordReportAt(a.getId(), r5.getId(), UUID.randomUUID().toString(), now - 5_000);
+        mr.recordReportAt(a.getId(), r5.getId(), UUID.randomUUID().toString(), now - 6_000);
 
         List<ModerationEventsRepository.Flagged> flags = svc.detectAndSuspend();
 
@@ -65,11 +82,11 @@ public class ModerationDetectTest {
         long now = System.currentTimeMillis();
 
         // tačno 5 (granica) -> ne trigeruje jer je pravilo >5
-        mr.recordReportAt(a.getId(), r1.getId(), "p1", now - 1_000);
-        mr.recordReportAt(a.getId(), r2.getId(), "p2", now - 2_000);
-        mr.recordReportAt(a.getId(), r3.getId(), "p3", now - 3_000);
-        mr.recordReportAt(a.getId(), r4.getId(), "p4", now - 4_000);
-        mr.recordReportAt(a.getId(), r5.getId(), "p5", now - 5_000);
+        mr.recordReportAt(a.getId(), r1.getId(), UUID.randomUUID().toString(), now - 1_000);
+        mr.recordReportAt(a.getId(), r2.getId(), UUID.randomUUID().toString(), now - 2_000);
+        mr.recordReportAt(a.getId(), r3.getId(), UUID.randomUUID().toString(), now - 3_000);
+        mr.recordReportAt(a.getId(), r4.getId(), UUID.randomUUID().toString(), now - 4_000);
+        mr.recordReportAt(a.getId(), r5.getId(), UUID.randomUUID().toString(), now - 5_000);
 
         List<ModerationEventsRepository.Flagged> flags = svc.detectAndSuspend();
 
@@ -91,7 +108,7 @@ public class ModerationDetectTest {
         // 9 prijava 30–40h unazad => unutar 48h, ali VAN 24h
         for (int i = 0; i < 9; i++) {
             long ts = now - (30L * 3_600_000L) - i * 1_000L;
-            mr.recordReportAt(a.getId(), r.getId(), "p"+i, ts);
+            mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString()+i, ts);
         }
 
         List<ModerationEventsRepository.Flagged> flags = svc.detectAndSuspend();
@@ -171,11 +188,11 @@ public class ModerationDetectTest {
         mr.recordBlockAt(b2.getId(), a.getId(), now - 40L * 3_600_000L);
         mr.recordBlockAt(b3.getId(), a.getId(), now - 44L * 3_600_000L);
 
-        mr.recordReportAt(a.getId(), r.getId(), "p1", now - 1_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p2", now - 2_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p3", now - 3_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p4", now - 4_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p5", now - 5_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 1_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 2_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 3_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 4_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 5_000);
 
         List<ModerationEventsRepository.Flagged> flags = svc.detectAndSuspend();
 
@@ -200,7 +217,7 @@ public class ModerationDetectTest {
         for (int i = 0; i < 11; i++) {
             long daysAgo = 2 + (i % 5);
             long ts = now - daysAgo * 24L * 3_600_000L - i * 1_000L;
-            mr.recordReportAt(a.getId(), r.getId(), "p"+i, ts);
+            mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString()+i, ts);
         }
 
         List<ModerationEventsRepository.Flagged> flags = svc.detectAndSuspend();
@@ -229,7 +246,7 @@ public class ModerationDetectTest {
 
         for (int i = 0; i < 4; i++) {
             long ts = now - (30L * H) - i * 1_000L;
-            mr.recordReportAt(a.getId(), r.getId(), "p"+i, ts);
+            mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString()+i, ts);
         }
 
         mr.recordBlockAt(b1.getId(), a.getId(), now - 13L * H);
@@ -237,10 +254,10 @@ public class ModerationDetectTest {
         mr.recordBlockAt(b3.getId(), a.getId(), now - 15L * H);
         mr.recordBlockAt(b4.getId(), a.getId(), now - 16L * H);
 
-        mr.recordReportAt(a.getId(), r.getId(), "p100", now - 10_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p101", now - 11_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p102", now - 12_000);
-        mr.recordReportAt(a.getId(), r.getId(), "p103", now - 13_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 10_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 11_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 12_000);
+        mr.recordReportAt(a.getId(), r.getId(), UUID.randomUUID().toString(), now - 13_000);
 
         List<ModerationEventsRepository.Flagged> flags = svc.detectAndSuspend();
 

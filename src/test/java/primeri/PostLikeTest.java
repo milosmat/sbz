@@ -3,11 +3,14 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
+import db.Db;
 import dto.LikePostRequest;
 import model.Post;
 import model.User;
@@ -16,8 +19,11 @@ import repo.PostRepository;
 import repo.UserRepository;
 import util.KnowledgeSessionHelper;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.UUID;
 
 public class PostLikeTest {
 
@@ -26,6 +32,15 @@ public class PostLikeTest {
     @BeforeClass
     public static void beforeClass() {
         kieContainer = KnowledgeSessionHelper.createRuleBase();
+    }
+    
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE posts CASCADE");
+        }
     }
 
     @Test
@@ -89,7 +104,7 @@ public class PostLikeTest {
 
             ValidationResult vr = new ValidationResult();
             // nepostojeći, ali ne-prazan userId + postojeći postId
-            s.insert(new LikePostRequest("nepostojeci-user", p.getId()));
+            s.insert(new LikePostRequest(UUID.randomUUID().toString(), p.getId()));
             s.insert(vr);
 
             s.getAgenda().getAgendaGroup("post-like").setFocus();
@@ -110,7 +125,7 @@ public class PostLikeTest {
 
             ValidationResult vr = new ValidationResult();
             // postojeći user + nepostojeći post -> 1 pravilo
-            s.insert(new LikePostRequest(u.getId(), "no-post"));
+            s.insert(new LikePostRequest(u.getId(), UUID.randomUUID().toString()));
             s.insert(vr);
 
             s.getAgenda().getAgendaGroup("post-like").setFocus();

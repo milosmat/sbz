@@ -3,15 +3,20 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Collection;
 import java.util.regex.Pattern;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.ClassObjectFilter;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
+import db.Db;
 import dto.RegisterRequest;
 import model.User;
 import model.ValidationResult;
@@ -26,6 +31,14 @@ public class RegistrationServiceTest {
     @BeforeClass
     public static void beforeClass() {
         kieContainer = KnowledgeSessionHelper.createRuleBase();
+    }
+    
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+        }
     }
 
     @Test

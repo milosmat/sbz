@@ -3,11 +3,19 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.UUID;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
+import db.Db;
+import dto.AddFriendRequest;
 import dto.BlockUserRequest;
 import model.User;
 import model.ValidationResult;
@@ -22,6 +30,14 @@ public class BlockFriendTest {
     @BeforeClass
     public static void beforeClass() {
         kc = KnowledgeSessionHelper.createRuleBase();
+    }
+    
+    @Before
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE friendships CASCADE");
+        }
     }
 
     @Test
@@ -96,7 +112,7 @@ public class BlockFriendTest {
             s.setGlobal("friendRepo", new FriendRepository());
 
             ValidationResult vr = new ValidationResult();
-            s.insert(new BlockUserRequest(me.getId(), "no-target"));
+            s.insert(new BlockUserRequest(me.getId(), UUID.randomUUID().toString()));
             s.insert(vr);
 
             s.getAgenda().getAgendaGroup("friend-block").setFocus();
@@ -149,4 +165,13 @@ public class BlockFriendTest {
             assertThat(fired, is(0));
         } finally { s.dispose(); }
     }
+    
+    @After
+    public void cleanup() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE friendships CASCADE");
+        }
+    }
+
 }

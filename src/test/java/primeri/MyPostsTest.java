@@ -3,11 +3,18 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.UUID;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
+import db.Db;
 import dto.MyPostsRequest;
 import model.User;
 import model.ValidationResult;
@@ -22,7 +29,21 @@ public class MyPostsTest {
     public static void beforeClass() {
         kieContainer = KnowledgeSessionHelper.createRuleBase();
     }
+    
+    @Before
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+        }
+    }
 
+    @After
+    public void cleanup() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+        }
+    }
+    
     @Test
     public void userId_prazan_okida1Pravilo() {
         KieSession kSession = KnowledgeSessionHelper.getStatefulKnowledgeSession(kieContainer, "test-session");
@@ -51,7 +72,7 @@ public class MyPostsTest {
             kSession.setGlobal("userRepo", userRepo);
 
             ValidationResult vr = new ValidationResult();
-            kSession.insert(new MyPostsRequest("neki-id"));
+            kSession.insert(new MyPostsRequest(UUID.randomUUID().toString()));
             kSession.insert(vr);
 
             kSession.getAgenda().getAgendaGroup("my-posts").setFocus();

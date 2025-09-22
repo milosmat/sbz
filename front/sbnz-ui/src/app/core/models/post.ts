@@ -4,7 +4,8 @@ export interface Post {
   id: string;
   authorId: string;
   text: string;
-  createdAt: number;
+  hashtags: string[];
   likes: number;
-  author?: User;
+  reports: number;
+  createdAtEpochMs: number;
 }

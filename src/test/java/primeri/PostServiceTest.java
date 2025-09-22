@@ -3,12 +3,18 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.*;
 
 import model.Post;
 import model.User;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
+import db.Db;
 import dto.CreatePostRequest;
 import repo.PostRepository;
 import repo.UserRepository;
@@ -16,6 +22,15 @@ import service.PostService;
 
 public class PostServiceTest {
 
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE posts CASCADE");
+        }
+    }
+    
     @Test
     public void listanjeMojihObjava_sortiraPoNovijim() throws InterruptedException {
         UserRepository userRepo = new UserRepository();

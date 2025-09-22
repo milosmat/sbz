@@ -3,11 +3,18 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.UUID;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
+import db.Db;
 import dto.CreatePostRequest;
 import model.User;
 import model.ValidationResult;
@@ -23,6 +30,14 @@ public class PostCreateTest {
         kieContainer = KnowledgeSessionHelper.createRuleBase();
     }
 
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+        }
+    }
+    
     @Test
     public void nije_ulogovan_okida1() {
         KieSession s = KnowledgeSessionHelper.getStatefulKnowledgeSession(kieContainer, "test-session");
@@ -43,7 +58,7 @@ public class PostCreateTest {
         try {
             s.setGlobal("userRepo", new UserRepository());
             ValidationResult vr = new ValidationResult();
-            s.insert(new CreatePostRequest("neki-id", "tekst", "#sbz"));
+            s.insert(new CreatePostRequest(UUID.randomUUID().toString(), "tekst", "#sbz"));
             s.insert(vr);
             s.getAgenda().getAgendaGroup("post-create").setFocus();
             int fired = s.fireAllRules();

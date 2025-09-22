@@ -1,1 +1,29 @@
-<p>new-post works!</p>
+<section class="new-post">
+  <h2>Novi post</h2>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <label for="text">Tekst</label>
+    <textarea
+      id="text"
+      rows="5"
+      formControlName="text"
+      placeholder="Šta ima?">
+    </textarea>
+    <div class="hint" *ngIf="form.controls.text.invalid && form.controls.text.touched">
+      Unesite tekst.
+    </div>
+
+    <label for="tags">Heštegovi</label>
+    <input
+      id="tags"
+      formControlName="tags"
+      placeholder="#sbz #java" />
+
+    <button type="submit" [disabled]="loading || form.invalid">
+      {{ loading ? 'Čuvam…' : 'Objavi' }}
+    </button>
+
+    <p class="error" *ngIf="error">{{ error }}</p>
+    <p class="success" *ngIf="success">{{ success }}</p>
+  </form>
+</section>

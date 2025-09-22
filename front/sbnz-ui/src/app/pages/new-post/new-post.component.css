@@ -1,0 +1,65 @@
+.new-post {
+  max-width: 640px;
+  margin: 1.25rem auto;
+  padding: 1rem;
+}
+
+h2 {
+  margin: 0 0 1rem;
+}
+
+form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+label {
+  font-weight: 600;
+}
+
+textarea,
+input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  font: inherit;
+  outline: none;
+}
+
+textarea:focus,
+input:focus {
+  border-color: #7aa7ff;
+  box-shadow: 0 0 0 2px rgba(122, 167, 255, 0.2);
+}
+
+button {
+  justify-self: start;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 6px;
+  background: #2f6df6;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+button[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.hint {
+  color: #a00;
+  font-size: 0.9rem;
+}
+
+.error {
+  color: #c0392b;
+  margin-top: 0.5rem;
+}
+
+.success {
+  color: #1e8e3e;
+  margin-top: 0.5rem;
+}

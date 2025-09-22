@@ -14,16 +14,20 @@ export class AuthService {
   }
 
   login(data: LoginRequest) {
-    return this.http.post<{ token: string; user: User }>(`${this.base}/login`, data);
-  }
-
-  register(data: RegisterRequest) {
-    return this.http.post<User>(`${this.base}/register`, data);
+    return this.http.post<{ token: string; user: User }>(
+      `${this.base}/login`,
+      data
+    );
   }
 
   setSession(token: string, user: User) {
     localStorage.setItem('token', token);
+    localStorage.setItem('uid', user.id);   // ako hoćeš i dalje da imaš uid
     this.currentUser.set(user);
+  }
+
+  register(data: RegisterRequest) {
+    return this.http.post<User>(`${this.base}/register`, data);
   }
 
   logout() {

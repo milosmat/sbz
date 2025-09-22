@@ -16,7 +16,11 @@ import { PostService } from '../../core/post.service';
 export class PostCardComponent {
   @Input({ required: true }) post!: Post;
   @Output() liked = new EventEmitter<void>();
+  @Input() authorName?: string; // opcioni, npr. "Pera Perić"
 
+  get title(): string {
+    return this.authorName ?? this.post.authorId;
+  }
   private alreadyLiked = signal(false);
   likedOnce = computed(() => this.alreadyLiked());
 

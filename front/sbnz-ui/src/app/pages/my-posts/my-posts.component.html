@@ -1,1 +1,28 @@
-<p>my-posts works!</p>
+<section class="my-posts">
+  <h2>Moje objave</h2>
+
+  <div *ngIf="loading" class="loading">Učitavam…</div>
+  <p class="error" *ngIf="!loading && error">{{ error }}</p>
+
+  <div *ngIf="!loading && !error && posts.length === 0" class="empty">
+    Još uvek nemate objava.
+  </div>
+
+  <ul class="list" *ngIf="!loading && !error && posts.length">
+    <li class="card" *ngFor="let p of posts">
+      <div class="meta">
+        <span class="date">{{ toDate(p.createdAtEpochMs) | date:'short' }}</span>
+        <span class="likes"> {{ p.likes }}</span>
+        <span class="reports" *ngIf="p.reports && p.reports > 0"> {{ p.reports }}</span>
+      </div>
+
+      <div class="text">{{ p.text }}</div>
+      <div class="tags" *ngIf="p.hashtags?.length">{{ tagsJoin(p.hashtags) }}</div>
+
+      <div class="actions">
+        <button (click)="like(p)">Like</button>
+        <button class="ghost" (click)="report(p)">Prijavi</button>
+      </div>
+    </li>
+  </ul>
+</section>

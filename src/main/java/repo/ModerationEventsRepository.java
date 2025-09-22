@@ -70,15 +70,43 @@ public class ModerationEventsRepository {
 
     // === flag lista (queue) ===
     public void addFlag(String userId, String reason, long until) {
-        String sql = "INSERT INTO moderation_flags(user_id, reason, until_ms) VALUES (?,?,?)";
-        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, java.util.UUID.fromString(userId));
-            ps.setString(2, reason);
-            ps.setLong(3, until);
-            ps.executeUpdate();
+        String insQueue = "INSERT INTO moderation_flags(user_id, reason, until_ms) VALUES (?,?,?)";
+        String insAudit = "INSERT INTO moderation_flags_audit(user_id, reason, until_ms, created_ms) VALUES (?,?,?,?)";
+        try (Connection c = Db.get()) {
+            try (PreparedStatement ps = c.prepareStatement(insQueue)) {
+                ps.setObject(1, java.util.UUID.fromString(userId));
+                ps.setString(2, reason);
+                ps.setLong(3, until);
+                ps.executeUpdate();
+            }
+            try (PreparedStatement ps2 = c.prepareStatement(insAudit)) {
+                ps2.setObject(1, java.util.UUID.fromString(userId));
+                ps2.setString(2, reason);
+                ps2.setLong(3, until);
+                ps2.setLong(4, System.currentTimeMillis());
+                ps2.executeUpdate();
+            }
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+
+    public List<Flagged> listRecentFlags(long sinceEpochMs, int limit) {
+        String sql = "SELECT user_id, reason, until_ms FROM moderation_flags_audit " +
+                     "WHERE created_ms >= ? ORDER BY id DESC LIMIT ?";
+        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setLong(1, sinceEpochMs);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Flagged> out = new ArrayList<>();
+                while (rs.next()) {
+                    String uid = rs.getObject("user_id", java.util.UUID.class).toString();
+                    out.add(new Flagged(uid, rs.getString("reason"), rs.getLong("until_ms")));
+                }
+                return out;
+            }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+    
     /** Vrati sve flagove i obriši ih (isti semantički efekat kao in-memory getAndClear) */
     public List<Flagged> getFlagsAndClear() {
         String sel = "SELECT id, user_id, reason, until_ms FROM moderation_flags ORDER BY id";
@@ -106,6 +134,7 @@ public class ModerationEventsRepository {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    
     // === čitanje događaja ===
     public List<ReportEvent> getReports() {
         String sql = "SELECT author_id, reporter_id, post_id, ts_ms FROM moderation_report_events ORDER BY ts_ms";
@@ -141,6 +170,8 @@ public class ModerationEventsRepository {
         try (Connection c = Db.get(); Statement st = c.createStatement()) {
             st.executeUpdate("TRUNCATE moderation_report_events");
             st.executeUpdate("TRUNCATE moderation_block_events");
+            st.executeUpdate("TRUNCATE moderation_flags");
+            st.executeUpdate("TRUNCATE moderation_flags_audit");
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 }

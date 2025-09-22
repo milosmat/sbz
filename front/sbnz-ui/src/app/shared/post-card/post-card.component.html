@@ -1,8 +1,8 @@
 <mat-card>
-  <mat-card-title>
-    {{ post.author?.firstName }} {{ post.author?.lastName }}
-  </mat-card-title>
-  <mat-card-subtitle>{{ post.createdAt | date:'short' }}</mat-card-subtitle>
+  <mat-card-title>{{ title }}</mat-card-title>
+
+  <!-- date pipe ume da primi epoch millis (number) -->
+  <mat-card-subtitle>{{ post.createdAtEpochMs | date:'short' }}</mat-card-subtitle>
 
   <mat-card-content>
     <p>{{ post.text }}</p>

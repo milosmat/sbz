@@ -3,14 +3,20 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.UUID;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
+import db.Db;
 import dto.ReportPostRequest;
 import model.Post;
 import model.User;
@@ -28,6 +34,15 @@ public class PostReportTest {
         kc = KnowledgeSessionHelper.createRuleBase();
     }
 
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE posts CASCADE");
+        }
+    }
+    
     @Test
     public void userId_prazan_okida1() {
         KieSession s = KnowledgeSessionHelper.getStatefulKnowledgeSession(kc, "test-session");
@@ -83,7 +98,7 @@ public class PostReportTest {
             s.setGlobal("postRepo", pr);
 
             ValidationResult vr = new ValidationResult();
-            s.insert(new ReportPostRequest("nepostojeci", p.getId(), "spam"));
+            s.insert(new ReportPostRequest(UUID.randomUUID().toString(), p.getId(), "spam"));
             s.insert(vr);
 
             s.getAgenda().getAgendaGroup("post-report").setFocus();
@@ -103,7 +118,7 @@ public class PostReportTest {
             s.setGlobal("postRepo", new PostRepository());
 
             ValidationResult vr = new ValidationResult();
-            s.insert(new ReportPostRequest(u.getId(), "no-post", "spam"));
+            s.insert(new ReportPostRequest(u.getId(), UUID.randomUUID().toString(), "spam"));
             s.insert(vr);
 
             s.getAgenda().getAgendaGroup("post-report").setFocus();

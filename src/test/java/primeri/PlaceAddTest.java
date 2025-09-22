@@ -3,14 +3,22 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
+
 import dto.CreatePlaceRequest;
 import model.Place;
 import model.User;
 import model.ValidationResult;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
+
+import db.Db;
 import repo.PlaceRepository;
 import repo.UserRepository;
 import util.KnowledgeSessionHelper;
@@ -24,6 +32,15 @@ public class PlaceAddTest {
         kc = KnowledgeSessionHelper.createRuleBase();
     }
 
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE places CASCADE");
+        }
+    }
+    
     @Test
     public void adminId_prazan_okida1() {
         KieSession s = KnowledgeSessionHelper.getStatefulKnowledgeSession(kc, "test-session");

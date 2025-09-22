@@ -144,6 +144,15 @@ public class UserRepository {
             }
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
+    
+    public void setPostingSuspendedUntil(String userId, long untilMs) {
+        String sql = "UPDATE users SET posting_suspended_until=? WHERE id=?";
+        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setTimestamp(1, new java.sql.Timestamp(untilMs));
+            ps.setObject(2, java.util.UUID.fromString(userId));
+            ps.executeUpdate();
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
 
     private User map(ResultSet rs) throws SQLException {
         String id   = rs.getObject("id", java.util.UUID.class).toString();

@@ -3,9 +3,17 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
+
 import model.Place;
 import model.User;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+
+import db.Db;
 import repo.PlaceRepository;
 import repo.UserRepository;
 import service.PlaceService;
@@ -13,6 +21,15 @@ import dto.CreatePlaceRequest;
 
 public class PlaceServiceTest {
 
+    @Before
+    @After
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE places CASCADE");
+        }
+    }
+    
     @Test
     public void admin_kreira_mesto_i_hashtagovi_se_parsiraju() {
         UserRepository ur = new UserRepository();

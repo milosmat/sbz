@@ -3,16 +3,39 @@ package primeri;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.List;
 
 import model.User;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+
+import db.Db;
 import repo.FriendRepository;
 import repo.UserRepository;
 import service.FriendService;
 
 public class FriendServiceTest {
 
+    @Before
+    public void cleanupbefore() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE friendships CASCADE");
+        }
+    }
+    
+    @After
+    public void cleanup() throws Exception {
+        try (Connection c = Db.get(); Statement st = c.createStatement()) {
+            st.executeUpdate("TRUNCATE users CASCADE");
+            st.executeUpdate("TRUNCATE friendships CASCADE");
+        }
+    }
+    
     @Test
     public void search_iskljuci_sebe_i_nadji_po_imer_prezime_email_gradu() {
         UserRepository ur = new UserRepository();

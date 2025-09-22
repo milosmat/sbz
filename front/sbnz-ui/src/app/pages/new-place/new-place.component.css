@@ -1,0 +1,6 @@
+.form { display:flex; flex-direction:column; gap:12px; max-width:520px; }
+label { display:flex; flex-direction:column; gap:6px; font-weight:600; }
+input, textarea { padding:10px; border:1px solid #ccc; border-radius:8px; }
+button { padding:10px 16px; border:0; border-radius:8px; cursor:pointer; }
+.msg { color: #2e7d32; margin-top: 8px; }
+.err { color: #c62828; margin-top: 8px; }

@@ -1,0 +1,33 @@
+<h2>Dodaj mesto</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()" class="form">
+  <label>
+    Naziv *
+    <input type="text" formControlName="name" />
+  </label>
+
+  <label>
+    Država *
+    <input type="text" formControlName="country" />
+  </label>
+
+  <label>
+    Grad *
+    <input type="text" formControlName="city" />
+  </label>
+
+  <label>
+    Opis
+    <textarea rows="4" formControlName="description"></textarea>
+  </label>
+
+  <label>
+    Heštegovi (npr: #putovanja #sbz)
+    <input type="text" formControlName="hashtagsLine" />
+  </label>
+
+  <button type="submit" [disabled]="loading">Sačuvaj</button>
+</form>
+
+<p class="msg" *ngIf="msg">{{ msg }}</p>
+<p class="err" *ngIf="err">{{ err }}</p>
