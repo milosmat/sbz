@@ -1,0 +1,71 @@
+package rules
+
+import dto.AddFriendRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+global repo.FriendRepository friendRepo;
+
+rule "FriendAdd: userId prazan"
+    salience 100
+    agenda-group "friend-add"
+when
+    $req : AddFriendRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani.");
+end
+
+rule "FriendAdd: targetId prazan"
+    salience 100
+    agenda-group "friend-add"
+when
+    $req : AddFriendRequest( targetId == null || targetId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Nedostaje ID korisnika koga želite da dodate.");
+end
+
+rule "FriendAdd: ne možete dodati sebe"
+    agenda-group "friend-add"
+when
+    $req : AddFriendRequest( userId != null, targetId != null,
+                             eval( $req.userId.trim().length() > 0 && $req.targetId.trim().length() > 0
+                                   && $req.userId.equals($req.targetId) ) )
+    $vr  : ValidationResult()
+then
+    $vr.add("Ne možete dodati sebe.");
+end
+
+rule "FriendAdd: ulogovani korisnik ne postoji"
+    agenda-group "friend-add"
+when
+    $req : AddFriendRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik (ulogovani) ne postoji.");
+end
+
+rule "FriendAdd: ciljani korisnik ne postoji"
+    agenda-group "friend-add"
+when
+    $req : AddFriendRequest( targetId != null, eval( $req.targetId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.targetId) )
+then
+    $vr.add("Korisnik kog želite da dodate ne postoji.");
+end
+
+rule "FriendAdd: već ste prijatelji"
+    agenda-group "friend-add"
+when
+    $req : AddFriendRequest( userId != null, targetId != null,
+                             eval( $req.userId.trim().length() > 0 && $req.targetId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( userRepo.existsById($req.userId) )
+    eval( userRepo.existsById($req.targetId) )
+    eval( friendRepo.areFriends($req.userId, $req.targetId) )
+then
+    $vr.add("Već ste prijatelji.");
+end

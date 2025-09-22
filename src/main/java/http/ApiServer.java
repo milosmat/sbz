@@ -9,6 +9,7 @@ import repo.FriendRepository;
 import repo.PostRepository;
 import repo.UserRepository;
 import service.AuthService;
+import service.FeedService;
 import service.FriendService;
 import service.PostService;
 import service.RegistrationService;
@@ -55,6 +56,8 @@ public class ApiServer {
     private final AuthService authService     = new AuthService(userRepo); // ako ti zatreba kasnije
     private final RegistrationService regService = new RegistrationService(userRepo);
     private final PlaceService placeService = new PlaceService(placeRepo, userRepo);
+    
+    private final FeedService feedService = new service.FeedService(userRepo, friendRepo, postRepo);
     
     private final SessionManager sessionManager = new SessionManager();
     
@@ -443,6 +446,60 @@ public class ApiServer {
             }
             ok(ex, out);
         }));
+        
+        // feed prijatelja
+        s.createContext("/api/feed/friends", Cors.wrap(ex -> {
+        	if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+        	Optional<String> uid = requireAuth(ex); if (!uid.isPresent()) return;
+        	try {
+	        	java.time.LocalDateTime now = java.time.LocalDateTime.now();
+	        	java.util.List<model.Post> list = feedService.friendFeed(uid.get(), now);
+	        	java.util.List<PostDTO> out = list.stream().map(ApiServer::toDto).collect(java.util.stream.Collectors.toList());
+	        	ok(ex, out);
+        	} catch (IllegalArgumentException iae) { badRequest(ex, iae.getMessage()); }
+        }));
+        
+        // preporuceni feed
+        s.createContext("/api/feed/recommended", Cors.wrap(ex -> {
+            if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
+            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+
+            Map<String,List<String>> q = Query.params(ex);
+            String userId = Query.str(q, "userId", null);
+            int limit = (int) Query.num(q, "limit", 20);
+
+            if (userId == null || userId.trim().isEmpty()) {
+                badRequest(ex, "userId is required");
+                return;
+            }
+
+            try {
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                java.util.List<dto.CandidatePost> recs = feedService.recommendedFeed(userId, now, limit);
+
+                // DTO za izlaz (bez nullova)
+                class RecDTO { PostDTO post; int score; java.util.List<String> reasons; }
+                java.util.List<RecDTO> out = new java.util.ArrayList<>();
+                if (recs != null) {
+                    for (dto.CandidatePost c : recs) {
+                        if (c == null || c.getPost() == null) continue;
+                        RecDTO d = new RecDTO();
+                        d.post = toDto(c.getPost());
+                        d.score = c.getScore();
+                        d.reasons = c.getReasons() == null ? java.util.Collections.emptyList() : c.getReasons();
+                        out.add(d);
+                    }
+                }
+
+                ok(ex, out);
+            } catch (IllegalArgumentException iae) {
+                badRequest(ex, iae.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                badRequest(ex, "internal error");
+            }
+        }));
+        
         
         s.createContext("/api/", Cors.wrap(ex -> {
             if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }

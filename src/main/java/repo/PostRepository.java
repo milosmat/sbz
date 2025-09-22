@@ -144,6 +144,97 @@ public class PostRepository {
         }
         return findById(postId).orElseThrow(() -> new IllegalStateException("Post nestao posle prijave?"));
     }
+    
+    public List<Post> findByAuthorsSince(Set<String> authorIds, LocalDateTime since) {
+        if (authorIds == null || authorIds.isEmpty()) return Collections.emptyList();
+
+        String placeholders = String.join(",", Collections.nCopies(authorIds.size(), "?"));
+        String sql =
+            "SELECT id, author_id, text_body, hashtags, likes, reports, created_at " +
+            "FROM posts " +
+            "WHERE created_at >= ? AND author_id IN (" + placeholders + ") " +
+            "ORDER BY created_at DESC";
+
+        List<Post> out = new ArrayList<>();
+        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            int i = 1;
+            ps.setTimestamp(i++, Timestamp.valueOf(since));
+            for (String id : authorIds) {
+                ps.setObject(i++, java.util.UUID.fromString(id));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(map(rs));
+            }
+            return out;
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+
+    // hestegovi sa postova koje je user lajkovao u nekom vr intervalu
+    public Set<String> findUserLikedHashtags(String userId, LocalDateTime since) {
+	    String sql = "SELECT DISTINCT tag " +
+	    "FROM post_likes l JOIN posts p ON p.id = l.post_id, UNNEST(p.hashtags) AS tag " +
+	    "WHERE l.user_id = ? AND p.created_at >= ?";
+	    Set<String> out = new HashSet<>();
+	    try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+		    ps.setObject(1, java.util.UUID.fromString(userId));
+		    ps.setTimestamp(2, Timestamp.valueOf(since));
+		    try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.add(rs.getString(1)); }
+		    return out;
+	    } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+    
+    public List<Post> findNonFriendPostsSince(String userId, Set<String> friendIds, LocalDateTime since) {
+    	StringBuilder sb = new StringBuilder();
+    	sb.append("SELECT id, author_id, text_body, hashtags, likes, reports, created_at FROM posts WHERE created_at >= ? AND author_id <> ?");
+    	if (friendIds != null && !friendIds.isEmpty()) {
+    		sb.append(" AND author_id NOT IN (").append(String.join(",", Collections.nCopies(friendIds.size(), "?"))).append(")");
+    	}
+    	sb.append(" ORDER BY created_at DESC");
+    	String sql = sb.toString();
+    	List<Post> out = new ArrayList<>();
+    	try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+	    	int i = 1;
+	    	ps.setTimestamp(i++, Timestamp.valueOf(since));
+	    	ps.setObject(i++, java.util.UUID.fromString(userId));
+	    	if (friendIds != null) for (String id : friendIds) ps.setObject(i++, java.util.UUID.fromString(id));
+	    	try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.add(map(rs)); }
+	    	return out;
+    	} catch (SQLException e) { throw new RuntimeException(e); }
+    }
+    
+    public Map<String,Integer> countHashtagUsageSince(LocalDateTime since) {
+    	String sql = "SELECT tag, COUNT(*) FROM (SELECT UNNEST(hashtags) AS tag FROM posts WHERE created_at >= ?) t GROUP BY tag";
+    	Map<String,Integer> out = new HashMap<>();
+    	try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+    		ps.setTimestamp(1, Timestamp.valueOf(since));
+	    	try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.put(rs.getString(1), rs.getInt(2)); }
+	    	return out;
+    	} catch (SQLException e) { throw new RuntimeException(e); }
+    	}
+
+
+    // hestegovi koje je user koristio
+    public Set<String> findUserAuthoredHashtags(String userId, LocalDateTime since) {
+	    String sql = "SELECT DISTINCT tag FROM posts p, UNNEST(p.hashtags) AS tag WHERE p.author_id = ? AND p.created_at >= ?";
+	    Set<String> out = new HashSet<>();
+	    try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+	    ps.setObject(1, java.util.UUID.fromString(userId));
+	    ps.setTimestamp(2, Timestamp.valueOf(since));
+	    try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.add(rs.getString(1)); }
+	    	return out;
+	    } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    // br postova autora
+    public int countByAuthor(String authorId) {
+	    String sql = "SELECT COUNT(*) FROM posts WHERE author_id=?";
+	    try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+	    ps.setObject(1, java.util.UUID.fromString(authorId));
+	    try (ResultSet rs = ps.executeQuery()) {
+	    	return rs.next() ? rs.getInt(1) : 0; }
+	    } catch (SQLException e) { throw new RuntimeException(e); }
+    }
 
     // --- mapper ---
     private Post map(ResultSet rs) throws SQLException {

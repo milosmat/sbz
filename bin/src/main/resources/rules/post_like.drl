@@ -1,0 +1,60 @@
+package rules
+
+import dto.LikePostRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+global repo.PostRepository postRepo;
+
+rule "PostLike: userId prazan"
+    salience 100
+    agenda-group "post-like"
+when
+    $req : LikePostRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani.");
+end
+
+rule "PostLike: postId prazan"
+    salience 100
+    agenda-group "post-like"
+when
+    $req : LikePostRequest( postId == null || postId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("ID objave nedostaje.");
+end
+
+rule "PostLike: korisnik ne postoji"
+    agenda-group "post-like"
+when
+    $req : LikePostRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik ne postoji.");
+end
+
+rule "PostLike: objava ne postoji"
+    agenda-group "post-like"
+when
+    $req : LikePostRequest( postId != null, eval( $req.postId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !postRepo.existsById($req.postId) )
+then
+    $vr.add("Objava ne postoji.");
+end
+
+rule "PostLike: vec lajkovano"
+    agenda-group "post-like"
+when
+    $req : LikePostRequest( userId != null, postId != null,
+                            eval( $req.userId.trim().length() > 0 && $req.postId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( userRepo.existsById($req.userId) )
+    eval( postRepo.existsById($req.postId) )
+    eval( postRepo.hasUserLiked($req.postId, $req.userId) )
+then
+    $vr.add("Već ste lajkovali ovu objavu.");
+end

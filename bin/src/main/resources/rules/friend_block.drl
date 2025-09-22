@@ -1,0 +1,71 @@
+package rules
+
+import dto.BlockUserRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+global repo.FriendRepository friendRepo;
+
+rule "FriendBlock: userId prazan"
+    salience 100
+    agenda-group "friend-block"
+when
+    $req : BlockUserRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani.");
+end
+
+rule "FriendBlock: targetId prazan"
+    salience 100
+    agenda-group "friend-block"
+when
+    $req : BlockUserRequest( targetId == null || targetId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Nedostaje ID korisnika koga želite da blokirate.");
+end
+
+rule "FriendBlock: ne možete blokirati sebe"
+    agenda-group "friend-block"
+when
+    $req : BlockUserRequest( userId != null, targetId != null,
+                             eval( $req.userId.trim().length() > 0 && $req.targetId.trim().length() > 0
+                                   && $req.userId.equals($req.targetId) ) )
+    $vr  : ValidationResult()
+then
+    $vr.add("Ne možete blokirati sebe.");
+end
+
+rule "FriendBlock: ulogovani korisnik ne postoji"
+    agenda-group "friend-block"
+when
+    $req : BlockUserRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik (ulogovani) ne postoji.");
+end
+
+rule "FriendBlock: ciljani korisnik ne postoji"
+    agenda-group "friend-block"
+when
+    $req : BlockUserRequest( targetId != null, eval( $req.targetId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.targetId) )
+then
+    $vr.add("Korisnik kog želite da blokirate ne postoji.");
+end
+
+rule "FriendBlock: već blokiran"
+    agenda-group "friend-block"
+when
+    $req : BlockUserRequest( userId != null, targetId != null,
+                             eval( $req.userId.trim().length() > 0 && $req.targetId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( userRepo.existsById($req.userId) )
+    eval( userRepo.existsById($req.targetId) )
+    eval( friendRepo.isBlocked($req.userId, $req.targetId) )
+then
+    $vr.add("Već ste blokirali ovog korisnika.");
+end

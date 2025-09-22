@@ -1,0 +1,113 @@
+package rules;
+
+import java.time.LocalDateTime;
+
+import dto.CandidatePost;
+import dto.UserFeedContext;
+import dto.PopularHashtag;
+import dto.PopularPost;
+import dto.RecommendedFeedRequest;
+import model.ValidationResult;
+import model.Post;
+
+global repo.UserRepository userRepo;
+global java.time.LocalDateTime NOW;
+
+dialect "java"
+
+// =====================
+// VALIDACIJE
+// =====================
+
+rule "FeedRecommend: userId prazan"
+    salience 100
+    agenda-group "feed-recommend"
+when
+    $req : RecommendedFeedRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani (userId nedostaje).");
+end
+
+rule "FeedRecommend: korisnik ne postoji"
+    agenda-group "feed-recommend"
+when
+    $req : RecommendedFeedRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik ne postoji.");
+end
+
+// =====================
+// SKORIRANJE
+// =====================
+
+// R1: post < 24h  -> +1
+rule "R1_Recent_24h"
+    agenda-group "feed-recommend"
+when
+    $uc : UserFeedContext( $now : now )
+    $c  : CandidatePost( $p : post )
+    eval( $p.getCreatedAt() != null && $p.getCreatedAt().isAfter($now.minusHours(24)) )
+then
+    $c.addScore(1, "nov post (<24h)");
+end
+
+// R2: korisnik lajkuje makar jedan hashtag iz posta -> +1
+rule "R2_Liked_hashtag"
+    agenda-group "feed-recommend"
+when
+    $uc : UserFeedContext( $liked : likedHashtags )
+    $c  : CandidatePost( $p : post )
+    // postoji String iz p.hashtags koji je član skupa $liked
+    exists( String( this memberOf $liked ) from $p.hashtags )
+then
+    $c.addScore(1, "lajkovani hešteg");
+end
+
+// R3: korisnik je autor postova sa tim hashtagom -> +1
+rule "R3_Authored_hashtag"
+    agenda-group "feed-recommend"
+when
+    $uc : UserFeedContext( $auth : authoredHashtags )
+    $c  : CandidatePost( $p : post )
+    exists( String( this memberOf $auth ) from $p.hashtags )
+then
+    $c.addScore(1, "autorov hešteg");
+end
+
+// R4: popularan post (fact PopularPost) -> +1
+rule "R4_Popular_post"
+    agenda-group "feed-recommend"
+when
+    $c : CandidatePost( $p : post )
+    PopularPost( postId == $p.id )
+then
+    $c.addScore(1, "popularan post");
+end
+
+// R5: popularan hešteg (fact PopularHashtag) -> +1
+rule "R5_Popular_hashtag"
+    agenda-group "feed-recommend"
+when
+    $c  : CandidatePost( $p : post )
+    $ph : PopularHashtag( $tag : tag )
+    // $tag je jedan od p.hashtags
+    String( this == $tag ) from $p.hashtags
+then
+    $c.addScore(1, "popularan hešteg");
+end
+
+// R6: boost – popularan hešteg i korisnik lajkuje taj hešteg -> +1
+rule "R6_Boost_popular_and_liked"
+    agenda-group "feed-recommend"
+when
+    $uc : UserFeedContext( $liked : likedHashtags )
+    $c  : CandidatePost( $p : post )
+    $ph : PopularHashtag( $tag : tag )
+    String( this == $tag ) from $p.hashtags
+    eval( $liked.contains($tag) )
+then
+    $c.addScore(1, "boost: popularan & lajkovan hešteg");
+end

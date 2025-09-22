@@ -1,0 +1,68 @@
+package rules
+
+import dto.LoginRequest;
+import model.ValidationResult;
+import model.User;
+import repo.UserRepository;
+
+global repo.UserRepository userRepo;
+global java.util.regex.Pattern EMAIL_RX;
+
+agenda-group "login"
+
+// Email prazan
+rule "Login: email prazan"
+salience 100
+agenda-group "login"
+when
+    $req : LoginRequest( email == null || email.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Unesite mejl");
+end
+
+// Format emaila (ako nije prazan)
+rule "Login: email format"
+agenda-group "login"
+when
+    $req : LoginRequest( email != null, eval( $req.email.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !EMAIL_RX.matcher($req.email.trim()).matches() )
+then
+    $vr.add("Neispravan mejl");
+end
+
+// Lozinka prazna
+rule "Login: lozinka prazna"
+agenda-group "login"
+when
+    $req : LoginRequest( password == null || password.length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Unesite lozinku");
+end
+
+// Korisnik ne postoji (provera u repo)
+rule "Login: korisnik ne postoji"
+agenda-group "login"
+when
+    $req : LoginRequest( email != null, eval( EMAIL_RX.matcher($req.email.trim()).matches() ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.findByEmail($req.email).isPresent() )
+then
+    $vr.add("Korisnik ne postoji");
+end
+
+// Pogrešna lozinka (samo ako korisnik postoji i lozinka nije prazna)
+rule "Login: pogrešna lozinka"
+agenda-group "login"
+when
+    $req : LoginRequest( email != null, password != null, eval( EMAIL_RX.matcher($req.email.trim()).matches() ) )
+    $vr  : ValidationResult()
+    eval( userRepo.findByEmail($req.email).isPresent() )
+    // uporedimo hash unete lozinke sa hash-om u repo
+    eval( !util.PasswordHasher.sha256($req.password)
+            .equals(userRepo.findByEmail($req.email).get().getPasswordHash()) )
+then
+    $vr.add("Pogrešna lozinka");
+end

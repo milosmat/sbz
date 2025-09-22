@@ -1,0 +1,83 @@
+package rules
+
+import dto.RegisterRequest;
+import model.ValidationResult;
+import repo.UserRepository;
+
+global repo.UserRepository userRepo;
+global java.util.regex.Pattern EMAIL_RX;
+
+agenda-group "registration"
+
+// Ime
+rule "Ime obavezno"
+salience 100
+agenda-group "registration"
+when
+    $req : RegisterRequest( firstName == null || firstName.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Ime je obavezno");
+end
+
+// Prezime
+rule "Prezime obavezno"
+agenda-group "registration"
+when
+    $req : RegisterRequest( lastName == null || lastName.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Prezime je obavezno");
+end
+
+// Mesto
+rule "Mesto obavezno"
+agenda-group "registration"
+when
+    $req : RegisterRequest( city == null || city.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Mesto stanovanja je obavezno");
+end
+
+// Email prazan
+rule "Email prazan"
+agenda-group "registration"
+when
+    $req : RegisterRequest( email == null || email.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Neispravan mejl");
+end
+
+// Email format (samo ako nije prazan)
+rule "Email format"
+agenda-group "registration"
+when
+    $req : RegisterRequest( email != null, eval( $req.email.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !EMAIL_RX.matcher($req.email.trim()).matches() )
+then
+    $vr.add("Neispravan mejl");
+end
+
+// Email duplikat (samo ako format prolazi)
+rule "Email zauzet"
+agenda-group "registration"
+when
+    $req : RegisterRequest( email != null, eval( EMAIL_RX.matcher($req.email.trim()).matches() ) )
+    $vr  : ValidationResult()
+    eval( userRepo.findByEmail($req.email).isPresent() )
+then
+    $vr.add("Mejl je već zauzet");
+end
+
+// Lozinka min 6
+rule "Lozinka min duzina"
+agenda-group "registration"
+when
+    $req : RegisterRequest( password == null || password.length() < 6 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Lozinka mora imati najmanje 6 karaktera");
+end

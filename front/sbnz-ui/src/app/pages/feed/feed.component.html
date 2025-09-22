@@ -1,7 +1,49 @@
-<div class="wrap">
-  <app-post-card
-    *ngFor="let p of posts"
-    [post]="p"
-    (liked)="refresh()">
-  </app-post-card>
+<div class="feed">
+  <!-- OBJAVE PRIJATELJA -->
+  <h2>Objave prijatelja</h2>
+  <div *ngIf="friendsLoading">Učitavam…</div>
+  <p class="error" *ngIf="friendsError">{{ friendsError }}</p>
+  <div class="empty" *ngIf="!friendsLoading && !friendsError && friends.length === 0">
+    Nema novih objava prijatelja.
+  </div>
+
+  <article class="card" *ngFor="let p of friends">
+    <div class="meta">
+      <span class="date">{{ toDate(p.createdAtEpochMs) | date:'short' }}</span>
+      <span class="likes">👍 {{ p.likes }}</span>
+      <span class="reports" *ngIf="p.reports > 0">🚩 {{ p.reports }}</span>
+    </div>
+    <div class="text">{{ p.text }}</div>
+    <div class="tags" *ngIf="p.hashtags?.length">{{ tagsJoin(p.hashtags) }}</div>
+  </article>
+
+  <div class="pager" *ngIf="friends.length < friendsTotal && !friendsLoading">
+    <button (click)="loadFriends()">Učitaj još</button>
+  </div>
+
+  <hr>
+
+  <!-- PREPORUČENO -->
+  <h2>Preporučeno</h2>
+  <div *ngIf="recLoading">Učitavam…</div>
+  <p class="error" *ngIf="recError">{{ recError }}</p>
+
+  <ng-container *ngIf="!recError">
+    <div class="empty" *ngIf="!recLoading && recs.length === 0">
+      Još uvek nema preporuka.
+    </div>
+
+    <article class="card" *ngFor="let r of recs">
+      <div class="meta">
+        <span class="date">{{ toDate(r.post.createdAtEpochMs) | date:'short' }}</span>
+        <span class="likes">👍 {{ r.post.likes }}</span>
+        <span class="score">⭐ {{ r.score }}</span>
+      </div>
+      <div class="text">{{ r.post.text }}</div>
+      <div class="tags" *ngIf="r.post.hashtags?.length">{{ tagsJoin(r.post.hashtags) }}</div>
+      <div class="reasons" *ngIf="r.reasons?.length">
+        <span class="reason" *ngFor="let why of r.reasons">• {{ why }}</span>
+      </div>
+    </article>
+  </ng-container>
 </div>

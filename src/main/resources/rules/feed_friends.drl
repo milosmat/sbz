@@ -1,0 +1,28 @@
+package rules;
+
+import dto.FriendFeedRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+
+dialect "java"
+
+rule "FeedFriends: userId prazan"
+    salience 100
+    agenda-group "feed-friends"
+when
+    $req : FriendFeedRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani (userId nedostaje).");
+end
+
+rule "FeedFriends: korisnik ne postoji"
+    agenda-group "feed-friends"
+when
+    $req : FriendFeedRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik ne postoji.");
+end

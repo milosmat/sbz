@@ -1,0 +1,28 @@
+package rules
+
+import dto.MyPostsRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+
+// userId prazan
+rule "MyPosts: userId prazan"
+    salience 100
+    agenda-group "my-posts"
+when
+    $req : MyPostsRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani (userId nedostaje).");
+end
+
+// korisnik ne postoji (bez lambdi)
+rule "MyPosts: korisnik ne postoji"
+    agenda-group "my-posts"
+when
+    $req : MyPostsRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik ne postoji.");
+end

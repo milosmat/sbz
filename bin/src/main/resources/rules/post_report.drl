@@ -1,0 +1,78 @@
+package rules
+
+import dto.ReportPostRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+global repo.PostRepository postRepo;
+
+rule "PostReport: userId prazan"
+    salience 100
+    agenda-group "post-report"
+when
+    $req : ReportPostRequest( userId == null || userId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani.");
+end
+
+rule "PostReport: postId prazan"
+    salience 100
+    agenda-group "post-report"
+when
+    $req : ReportPostRequest( postId == null || postId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("ID objave nedostaje.");
+end
+
+rule "PostReport: korisnik ne postoji"
+    agenda-group "post-report"
+when
+    $req : ReportPostRequest( userId != null, eval( $req.userId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.userId) )
+then
+    $vr.add("Korisnik ne postoji.");
+end
+
+rule "PostReport: objava ne postoji"
+    agenda-group "post-report"
+when
+    $req : ReportPostRequest( postId != null, eval( $req.postId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !postRepo.existsById($req.postId) )
+then
+    $vr.add("Objava ne postoji.");
+end
+
+// opciono – možeš zabraniti prijavu sopstvene objave
+rule "PostReport: ne možete prijaviti sopstvenu objavu"
+    agenda-group "post-report"
+when
+    $req : ReportPostRequest( userId != null, postId != null,
+                              eval( $req.userId.trim().length() > 0 && $req.postId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( userRepo.existsById($req.userId) )
+    eval( postRepo.existsById($req.postId) )
+    // korisnik je autor te objave?
+    eval( userRepo.findById($req.userId).isPresent()
+          && postRepo.findById($req.postId).isPresent()
+          && userRepo.findById($req.userId).get().getId()
+             .equals(postRepo.findById($req.postId).get().getAuthorId()) )
+then
+    $vr.add("Ne možete prijaviti sopstvenu objavu.");
+end
+
+rule "PostReport: već prijavljena"
+    agenda-group "post-report"
+when
+    $req : ReportPostRequest( userId != null, postId != null,
+                              eval( $req.userId.trim().length() > 0 && $req.postId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( userRepo.existsById($req.userId) )
+    eval( postRepo.existsById($req.postId) )
+    eval( postRepo.hasUserReported($req.postId, $req.userId) )
+then
+    $vr.add("Već ste prijavili ovu objavu.");
+end
