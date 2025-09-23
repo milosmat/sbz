@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
 import { FeedApiService, Page, PostDTO, RecDTO } from '../../core/feed-api.service';
 
 @Component({
@@ -13,55 +12,63 @@ import { FeedApiService, Page, PostDTO, RecDTO } from '../../core/feed-api.servi
 export class FeedComponent implements OnInit {
   userId: string | null = null;
 
-  // Friends feed
+  // Friends feed (Page<PostDTO>)
   friendsPage = 0;
   friendsSize = 20;
-  friendsDays = 1;
+  friendsDays = 1; // backend trenutno ignoriše; DRL filtrira 24h
   friendsLoading = false;
   friendsError: string | null = null;
   friends: PostDTO[] = [];
   friendsTotal = 0;
 
-  // Recommended feed
+  // Recommended feed (RecDTO[])
   recLoading = false;
   recError: string | null = null;
   recs: RecDTO[] = [];
 
-  constructor(private api: FeedApiService, private route: ActivatedRoute) {}
+  // prikaz prioriteta razloga
+  private reasonPriority: Record<string, number> = {
+    'boost: popularan & lajkovan hešteg': 1,
+    'popularan post': 2,
+    'popularan hešteg': 3,
+    'lajkovani hešteg': 4,
+    'autorski hešteg': 5,
+    'nov post (<24h)': 6
+  };
 
-  private readUserIdFromStorage(): string | null {
-    const keys = ['user', 'currentUser', 'loggedUser'];
-    for (const k of keys) {
-      try {
-        const v = localStorage.getItem(k);
-        const id = v ? JSON.parse(v)?.id : null;
-        if (id) return id;
-      } catch {}
-    }
-    return null;
-  }
+  constructor(private api: FeedApiService) {}
 
   ngOnInit(): void {
-    // auth servis postavlja 'token' i 'uid' u localStorage
-    this.userId = localStorage.getItem('uid');  // ⟵ umesto parsiranja 'user'
+    // auth servis postavlja 'token' i 'uid' u localStorage (interceptor šalje Bearer)
+    this.userId = localStorage.getItem('uid');
     if (this.userId) {
       this.loadFriends(true);
+      this.loadRecommended();
+    } else {
+      this.friends = [];
+      this.recs = [];
     }
-    this.loadRecommended(); // preporuke uvek probaj (treba Bearer token; interceptor je već tu)
   }
 
+  // Helpers
   toDate(ms: number): Date { return new Date(ms); }
   tagsJoin(tags?: string[]): string { return (tags ?? []).map(t => `#${t}`).join(' '); }
+  isBoost(why: string): boolean { return why?.toLowerCase().startsWith('boost'); }
 
+  trackPostId = (_: number, p: PostDTO) => p?.id;
+  trackRec = (_: number, r: RecDTO) => r?.post?.id + ':' + r?.score;
+
+  // Friends
   loadFriends(reset = false): void {
-    if (!this.userId) return;
-    if (reset) { this.friendsPage = 0; this.friends = []; }
+    if (!this.userId || this.friendsLoading) return;
+    if (reset) { this.friendsPage = 0; this.friends = []; this.friendsTotal = 0; }
     this.friendsLoading = true; this.friendsError = null;
 
     this.api.getFriendsFeed(this.userId, this.friendsDays, this.friendsPage, this.friendsSize).subscribe({
       next: (page: Page<PostDTO>) => {
-        this.friendsTotal = page.totalElements;
-        this.friends = [...this.friends, ...page.content];
+        const content = page?.content ?? [];
+        this.friendsTotal = page?.totalElements ?? content.length;
+        this.friends = [...this.friends, ...content];
         this.friendsPage++;
         this.friendsLoading = false;
       },
@@ -72,13 +79,26 @@ export class FeedComponent implements OnInit {
     });
   }
 
+  // Recommended
   loadRecommended(limit = 20): void {
-    if (!this.userId) { this.recs = []; return; } // isti princip kao friends
+    if (!this.userId || this.recLoading) { this.recs = []; return; }
     this.recLoading = true; this.recError = null;
+
     this.api.getRecommended(this.userId, limit).subscribe({
-      next: (list) => { this.recs = (list ?? []).filter(r => !!r && !!r.post); this.recLoading = false; },
-      error: (err) => { this.recError = err?.error?.error ?? 'Greška pri učitavanju.'; this.recLoading = false; }
+      next: (list) => {
+        const cleaned = (list ?? []).filter(r => !!r && !!r.post);
+        // unikatni razlozi + sort po prioritetu
+        this.recs = cleaned.map(r => ({
+          ...r,
+          reasons: Array.from(new Set(r.reasons ?? []))
+            .sort((a, b) => (this.reasonPriority[a] ?? 99) - (this.reasonPriority[b] ?? 99))
+        }));
+        this.recLoading = false;
+      },
+      error: (err) => {
+        this.recError = err?.error?.error ?? 'Greška pri učitavanju.';
+        this.recLoading = false;
+      }
     });
   }
-
 }

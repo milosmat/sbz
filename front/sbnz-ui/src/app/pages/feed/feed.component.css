@@ -1,11 +1,42 @@
-.feed { max-width: 720px; margin: 24px auto; padding: 0 12px; }
-.card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px; margin-bottom: 12px; background: #fff; }
-.meta { display: flex; gap: 12px; font-size: 12px; color: #666; margin-bottom: 6px; }
-.text { white-space: pre-wrap; margin-bottom: 6px; }
-.tags { color: #0a7; font-size: 12px; }
-.reasons { margin-top: 6px; font-size: 12px; color: #444; }
-.reasons .reason { display: inline-block; margin-right: 8px; }
-.error { color: #c00; }
-.empty { color: #777; }
-.pager { display: flex; justify-content: center; margin-top: 12px; }
-.pager button { padding: 8px 16px; border-radius: 8px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+.feed { max-width: 720px; margin: 1rem auto; padding: 0 1rem; }
+
+h2 { margin: 1rem 0 .5rem; font-size: 1.25rem; }
+
+.loading { opacity: .7; margin: .5rem 0; }
+.error { color: #b91c1c; margin: .5rem 0; }
+.empty { opacity: .7; margin: .5rem 0; }
+
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: .75rem 1rem;
+  margin-bottom: .75rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
+}
+
+.meta { display: flex; gap: .75rem; align-items: center; font-size: .85rem; color: #374151; }
+.meta .likes, .meta .score { margin-left: auto; }
+.meta .reports { color: #b45309; }
+
+.text { margin: .5rem 0; font-size: 1rem; }
+.tags { font-size: .9rem; color: #6b7280; }
+
+.pager { display: flex; justify-content: center; margin: .75rem 0 1rem; }
+.pager button {
+  padding: .5rem .9rem; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb;
+  cursor: pointer;
+}
+.pager button:hover { background: #f3f4f6; }
+
+/* reasons chips */
+.reasons { margin-top: .5rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.reasons-title { font-size: .8rem; opacity: .8; }
+.chips { display: flex; gap: .25rem; list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
+.chip {
+  font-size: .75rem; padding: .2rem .5rem; border-radius: 9999px;
+  background: #f3f4f6; border: 1px solid #e5e7eb;
+}
+.chip-boost {
+  background: #eef6ff; border-color: #bfdbfe;
+}

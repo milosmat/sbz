@@ -40,6 +40,12 @@ import java.util.stream.Collectors;
  *  POST /api/posts (body: { authorId, text, tags })
  */
 public class ApiServer {
+	
+public static class RecDTO {
+	    public PostDTO post;
+	    public int score;
+	    public java.util.List<String> reasons;
+	}
 
     private static final Gson GSON = new Gson();
 
@@ -152,41 +158,6 @@ public class ApiServer {
             String userId = path.substring(prefix.length());
             List<PostDTO> list = postRepo.findByAuthor(userId).stream().map(ApiServer::toDto).collect(Collectors.toList());
             ok(ex, list);
-        }));
-        
-        // feed prijatelja (1 dan po difoltu)
-        s.createContext("/api/feed/friends", Cors.wrap(ex -> {
-            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
-            Map<String,List<String>> q = Query.params(ex);
-            String userId = Query.str(q, "userId", null);
-            int days = (int) Query.num(q, "days", 1);
-            int page = (int) Query.num(q, "page", 0);
-            int size = (int) Query.num(q, "size", 20);
-            if (userId == null) { badRequest(ex, "userId is required"); return; }
-
-            // ID-jevi prijatelja
-            Set<String> friendIds = friendRepo.getFriendsOf(userId);
-
-            // Postovi prijatelja (sortirani u repo-u po autoru; ovde još jednom globalno sort)
-            List<Post> all = new ArrayList<>();
-            for (String fid : friendIds) {
-                all.addAll(postRepo.findByAuthor(fid));
-            }
-            long cutoffMs = System.currentTimeMillis() - days * 24L * 3600_000L;
-            List<Post> filtered = all.stream()
-                    .filter(p -> p.getCreatedAt().toInstant(ZoneOffset.UTC).toEpochMilli() >= cutoffMs)
-                    .sorted((a,b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-                    .collect(Collectors.toList());
-
-            // stranica
-            int from = Math.max(0, page*size);
-            int to = Math.min(filtered.size(), from+size);
-            List<Post> slice = from >= to ? Collections.emptyList() : filtered.subList(from, to);
-
-            Page<PostDTO> out = new Page<>();
-            out.page = page; out.size = size; out.totalElements = filtered.size();
-            out.content = slice.stream().map(ApiServer::toDto).collect(Collectors.toList());
-            ok(ex, out);
         }));
 
         // postovi po autoru
@@ -449,14 +420,37 @@ public class ApiServer {
         
         // feed prijatelja
         s.createContext("/api/feed/friends", Cors.wrap(ex -> {
-        	if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
-        	Optional<String> uid = requireAuth(ex); if (!uid.isPresent()) return;
-        	try {
-	        	java.time.LocalDateTime now = java.time.LocalDateTime.now();
-	        	java.util.List<model.Post> list = feedService.friendFeed(uid.get(), now);
-	        	java.util.List<PostDTO> out = list.stream().map(ApiServer::toDto).collect(java.util.stream.Collectors.toList());
-	        	ok(ex, out);
-        	} catch (IllegalArgumentException iae) { badRequest(ex, iae.getMessage()); }
+            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+            Optional<String> uid = requireAuth(ex); if (!uid.isPresent()) return;
+
+            try {
+                Map<String,List<String>> q = Query.params(ex);
+                int page = (int) Query.num(q, "page", 0);
+                int size = (int) Query.num(q, "size", 20);
+
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                java.util.List<model.Post> all = feedService.friendFeed(uid.get(), now);
+
+                int total = all.size();
+                int from  = Math.max(0, page * size);
+                int to    = Math.min(total, from + size);
+                java.util.List<model.Post> slice = from < to ? all.subList(from, to) : java.util.Collections.emptyList();
+
+                java.util.List<PostDTO> content = slice.stream().map(ApiServer::toDto).collect(java.util.stream.Collectors.toList());
+
+                java.util.Map<String,Object> out = new java.util.LinkedHashMap<>();
+                out.put("content", content);
+                out.put("page", page);
+                out.put("size", size);
+                out.put("totalElements", total);
+
+                ok(ex, out);
+            } catch (IllegalArgumentException iae) {
+                badRequest(ex, iae.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                badRequest(ex, "internal error");
+            }
         }));
         
         // preporuceni feed
@@ -476,17 +470,16 @@ public class ApiServer {
             try {
                 java.time.LocalDateTime now = java.time.LocalDateTime.now();
                 java.util.List<dto.CandidatePost> recs = feedService.recommendedFeed(userId, now, limit);
-
-                // DTO za izlaz (bez nullova)
-                class RecDTO { PostDTO post; int score; java.util.List<String> reasons; }
+          
                 java.util.List<RecDTO> out = new java.util.ArrayList<>();
+
                 if (recs != null) {
                     for (dto.CandidatePost c : recs) {
                         if (c == null || c.getPost() == null) continue;
                         RecDTO d = new RecDTO();
                         d.post = toDto(c.getPost());
                         d.score = c.getScore();
-                        d.reasons = c.getReasons() == null ? java.util.Collections.emptyList() : c.getReasons();
+                        d.reasons = (c.getReasons() == null) ? java.util.Collections.emptyList() : c.getReasons();
                         out.add(d);
                     }
                 }
@@ -528,7 +521,12 @@ public class ApiServer {
             return Optional.empty();
         }
         String token = authHeader.substring("Bearer ".length()).trim();
-        return sessionManager.getUserId(token);
+        Optional<String> uid = sessionManager.getUserId(token);
+        if (!uid.isPresent()) {            
+            badRequest(ex, "Invalid or expired session"); // pošalji odgovor, ne ostavljaj pending
+            return Optional.empty();
+        }
+        return uid;
     }
     
     private static String str(Map<?,?> m, String k){
