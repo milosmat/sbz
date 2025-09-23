@@ -1,0 +1,12 @@
+<h2>Mesta</h2>
+<div *ngIf="loading">Učitavanje…</div>
+<div *ngIf="!loading && error" class="error">{{ error }}</div>
+<div *ngIf="!loading && !error && places.length === 0">Nema mesta.</div>
+
+<ul *ngIf="!loading && !error && places.length > 0" class="place-list">
+  <li *ngFor="let p of places">
+    <a [routerLink]="['/places', p.id]">
+      <strong>{{ p.name }}</strong> – {{ p.city }}, {{ p.country }}
+    </a>
+  </li>
+</ul>

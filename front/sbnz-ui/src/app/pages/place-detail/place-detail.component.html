@@ -1,0 +1,30 @@
+<div *ngIf="loading">Učitavanje…</div>
+<div *ngIf="!loading && error" class="error">{{ error }}</div>
+
+<section *ngIf="!loading && !error && place">
+  <h2>{{ place.name }}</h2>
+  <div class="meta">{{ place.city }}, {{ place.country }}</div>
+  <div class="tags">
+    <span class="tag" *ngFor="let t of place.hashtags">{{ t }}</span>
+  </div>
+
+  <h3>Ocenite ovo mesto</h3>
+  <form (ngSubmit)="submitRating()">
+    <label>Ocena (1–5):
+      <input type="number" [(ngModel)]="score" name="score" min="1" max="5" required>
+    </label>
+
+    <label>Opis:
+      <textarea [(ngModel)]="description" name="description" rows="3"></textarea>
+    </label>
+
+    <label>Heštegovi:
+      <input type="text" [(ngModel)]="hashtagsLine" name="hashtagsLine" placeholder="#film #romansa">
+    </label>
+
+    <button type="submit" [disabled]="sending">Pošalji ocenu</button>
+  </form>
+
+  <div *ngIf="sendSuccess" class="ok">Ocena sačuvana.</div>
+  <div *ngIf="sendError" class="error">{{ sendError }}</div>
+</section>

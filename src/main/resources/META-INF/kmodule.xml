@@ -4,5 +4,7 @@
     <kbase name="rules" packages="rules" eventProcessingMode="stream">
         <ksession name="test-session"/>
     </kbase>
-
+  <kbase name="ads-kbase" packages="rules.ads" eventProcessingMode="stream">
+    <ksession name="ads-session" type="stateful"/>
+  </kbase>
 </kmodule>

@@ -10,8 +10,15 @@ export const routes: Routes = [
       { path: 'new', loadComponent: () => import('./pages/new-post/new-post.component').then(m => m.NewPostComponent) },
       { path: 'friends/search', loadComponent: () => import('./pages/friends-search/friends-search.component').then(m => m.FriendsSearchComponent) },
       { path: 'places/new', loadComponent: () => import('./pages/new-place/new-place.component').then(m => m.NewPlaceComponent) },
-      { path: 'feed', loadComponent: () => import('./pages/feed/feed.component').then(m => m.FeedComponent) }
+      { path: 'feed', loadComponent: () => import('./pages/feed/feed.component').then(m => m.FeedComponent) },
       { path: 'admin/moderation', loadComponent: () => import('./pages/admin-moderation/admin-moderation.component').then(m => m.AdminModerationComponent) },
+      // NOVO: reklame (stranica)
+      { path: 'ads', loadComponent: () => import('./pages/recommended-ads/recommended-ads.component').then(m => m.RecommendedAdsComponent) },
+
+      // NOVO: mesta (lista i detalj)
+      { path: 'places', loadComponent: () => import('./pages/places-list/places-list.component').then(m => m.PlacesListComponent) },
+      { path: 'places/:id', loadComponent: () => import('./pages/place-detail/place-detail.component').then(m => m.PlaceDetailComponent) },
+
     ]
   },
   { path: '**', redirectTo: '' }

@@ -4,17 +4,24 @@ import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dto.CreatePostRequest;
+import dto.CreateRatingRequest;
 import model.Post;
+import model.Rating;
 import repo.FriendRepository;
 import repo.PostRepository;
+import repo.RatingRepository;
 import repo.UserRepository;
+import service.AdsService;
 import service.AuthService;
 import service.FeedService;
 import service.FriendService;
 import service.PostService;
+import service.RatingService;
 import service.RegistrationService;
 import repo.PlaceRepository;
 import service.PlaceService;
+import dto.AdSuggestion;
+import dto.AdsRecommendRequest;
 import dto.CreatePlaceRequest;
 import model.Place;
 import repo.ModerationEventsRepository;
@@ -55,7 +62,10 @@ public static class RecDTO {
     private final FriendRepository friendRepo = new FriendRepository();
     private final PlaceRepository placeRepo = new PlaceRepository();
     private final ModerationEventsRepository modRepo = ModerationEventsRepository.getInstance();
+    private final RatingRepository ratingRepo = new RatingRepository();
     
+    private final RatingService ratingService = new RatingService(ratingRepo, userRepo, placeRepo);
+    private final AdsService adsService = new AdsService(userRepo, postRepo, placeRepo, ratingRepo);
     private final ModerationService moderationService = new ModerationService(userRepo, modRepo);
     private final FriendService friendService = new FriendService(userRepo, friendRepo);
     private final PostService postService     = new PostService(postRepo, userRepo);
@@ -493,6 +503,145 @@ public static class RecDTO {
             }
         }));
         
+        s.createContext("/api/places/rate", Cors.wrap(ex -> {
+            if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
+            if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+
+            Optional<String> uid = requireAuth(ex);
+            if (!uid.isPresent()) return;
+
+            try {
+                String body = readBody(ex.getRequestBody());
+                CreateRatingRequest req = GSON.fromJson(body, CreateRatingRequest.class);
+                if (req == null) { badRequest(ex, "Invalid payload"); return; }
+                // sigurnost: userId uzimamo iz sesije
+                req.userId = uid.get();
+
+                model.ValidationResult vr = new model.ValidationResult();
+                Rating r = ratingService.create(req, vr);
+
+                if (!vr.isOk()) {
+                    badRequest(ex, String.join("; ", vr.getErrors()));
+                    return;
+                }
+
+                ok(ex, r);
+            } catch (IllegalArgumentException iae) {
+                badRequest(ex, iae.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                badRequest(ex, "internal error");
+            }
+        }));
+
+        s.createContext("/api/ads/recommended", Cors.wrap(ex -> {
+            if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
+            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+
+            Optional<String> uid = requireAuth(ex);
+            if (!uid.isPresent()) return;
+
+            try {
+                Map<String,List<String>> q = Query.params(ex);
+                int limit = (int) Query.num(q, "limit", 20);
+
+                AdsRecommendRequest req = new AdsRecommendRequest();
+                req.userId = uid.get();
+                req.limit = limit;
+
+                model.ValidationResult vr = new model.ValidationResult();
+                java.util.List<AdSuggestion> ads = adsService.recommend(req, vr);
+
+                if (!vr.isOk()) { // <<<<<< OVDE JE PROMENA
+                    badRequest(ex, String.join("; ", vr.getErrors()));
+                    return;
+                }
+
+                // mapiranje u DTO za front
+                java.util.List<AdDTO> out = new java.util.ArrayList<>();
+                for (AdSuggestion a : ads) {
+                    if (a == null || a.place == null) continue;
+                    out.add(toAdDto(a.place, a.why));
+                }
+                ok(ex, out);
+            } catch (IllegalArgumentException iae) {
+                badRequest(ex, iae.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+                badRequest(ex, "internal error");
+            }
+        }));
+
+        s.createContext("/api/places/list", Cors.wrap(ex -> {
+            if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
+            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+
+            // ako želiš javno dostupno, izbaci requireAuth
+            Optional<String> uid = requireAuth(ex);
+            if (!uid.isPresent()) return;
+
+            try {
+                Map<String,List<String>> q = Query.params(ex);
+                String term = Query.str(q, "q", "").toLowerCase();
+                String city = Query.str(q, "city", "").toLowerCase();
+                int limit   = (int) Query.num(q, "limit", 50);
+
+                java.util.Collection<model.Place> all = placeRepo.findAll();
+                java.util.List<PlaceDTO> out = new java.util.ArrayList<>();
+
+                for (model.Place p : all) {
+                    if (p == null) continue;
+
+                    boolean okByTerm = term.isEmpty()
+                        || (p.getName()!=null && p.getName().toLowerCase().contains(term))
+                        || (p.getDescription()!=null && p.getDescription().toLowerCase().contains(term))
+                        || (p.getHashtags()!=null && p.getHashtags().stream().anyMatch(h -> h!=null && h.toLowerCase().contains(term)));
+
+                    boolean okByCity = city.isEmpty()
+                        || (p.getCity()!=null && p.getCity().toLowerCase().contains(city));
+
+                    if (okByTerm && okByCity) {
+                        out.add(toPlaceDto(p));
+                        if (out.size() >= Math.max(1, limit)) break;
+                    }
+                }
+
+                ok(ex, out);
+            } catch (Exception e) {
+                e.printStackTrace();
+                badRequest(ex, "internal error");
+            }
+        }));
+        
+        s.createContext("/api/places/", Cors.wrap(ex -> {
+            if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
+            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+
+            // (ako želiš da detalji rade samo za ulogovane, ostavi requireAuth;
+            //  ako hoćeš javno, slobodno ukloni sledeće 3 linije)
+            Optional<String> uid = requireAuth(ex);
+            if (!uid.isPresent()) return;
+
+            String path = ex.getRequestURI().getPath();      // npr. /api/places/503b...
+            final String base = "/api/places/";
+            if (!path.startsWith(base) || path.length() <= base.length()) { methodNotAllowed(ex); return; }
+            String id = path.substring(base.length());
+
+            // izbegni sudar sa /api/places/list i /api/places/rate
+            if ("list".equalsIgnoreCase(id) || "rate".equalsIgnoreCase(id)) { methodNotAllowed(ex); return; }
+
+            try {
+                java.util.Optional<model.Place> opt = placeRepo.findById(id);
+                if (!opt.isPresent()) {
+                    send(ex, 404, map("error", "place not found"));
+                    return;
+                }
+                ok(ex, toPlaceDto(opt.get())); // koristi helper iz ranije: toPlaceDto(Place)
+            } catch (Exception e) {
+                e.printStackTrace();
+                badRequest(ex, "internal error");
+            }
+        }));
         
         s.createContext("/api/", Cors.wrap(ex -> {
             if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
@@ -573,6 +722,45 @@ public static class RecDTO {
         d.likes = p.getLikes();
         d.reports = p.getReports();
         d.createdAtEpochMs = p.getCreatedAt().toInstant(ZoneOffset.UTC).toEpochMilli();
+        return d;
+    }
+    
+    static class AdDTO {
+        public String id;
+        public String name;
+        public String country;
+        public String city;
+        public String description;
+        public List<String> hashtags;
+        public String why;
+    }
+    private static AdDTO toAdDto(model.Place p, String why) {
+        AdDTO d = new AdDTO();
+        d.id = p.getId();
+        d.name = p.getName();
+        d.country = p.getCountry();
+        d.city = p.getCity();
+        d.description = p.getDescription();
+        d.hashtags = new ArrayList<>(p.getHashtags());
+        d.why = why;
+        return d;
+    }
+    static class PlaceDTO {
+        public String id;
+        public String name;
+        public String country;
+        public String city;
+        public String description;
+        public java.util.List<String> hashtags;
+    }
+    private static PlaceDTO toPlaceDto(model.Place p) {
+        PlaceDTO d = new PlaceDTO();
+        d.id = p.getId();
+        d.name = p.getName();
+        d.country = p.getCountry();
+        d.city = p.getCity();
+        d.description = p.getDescription();
+        d.hashtags = new java.util.ArrayList<>(p.getHashtags());
         return d;
     }
 

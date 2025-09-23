@@ -1,0 +1,26 @@
+<div class="ads-wrapper">
+  <h2>Preporučena mesta</h2>
+
+  <div *ngIf="loading">Učitavanje…</div>
+  <div *ngIf="!loading && error" class="error">
+    {{ error }} <button (click)="fetch()">Pokušaj ponovo</button>
+  </div>
+  <div *ngIf="!loading && !error && ads.length === 0">Trenutno nema preporuka.</div>
+
+  <div class="grid" *ngIf="!loading && !error && ads.length > 0">
+    <div class="card" *ngFor="let ad of ads">
+      <div class="header">
+        <h3>{{ ad.name }}</h3>
+        <span class="city">{{ ad.city }}, {{ ad.country }}</span>
+      </div>
+      <div class="tags">
+        <span class="tag" *ngFor="let t of ad.hashtags">{{ t }}</span>
+      </div>
+      <div class="why">
+        <strong>Zašto ovo vidiš?</strong>
+        <p>{{ ad.why }}</p>
+      </div>
+      <a [routerLink]="['/places', ad.id]" class="btn">Pogledaj detalje</a>
+    </div>
+  </div>
+</div>

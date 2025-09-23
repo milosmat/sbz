@@ -1,11 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FeedApiService, Page, PostDTO, RecDTO } from '../../core/feed-api.service';
+import {RecommendedAdsComponent} from '../recommended-ads/recommended-ads.component';
 
 @Component({
   selector: 'app-feed',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RecommendedAdsComponent],
   templateUrl: './feed.component.html',
   styleUrls: ['./feed.component.css']
 })

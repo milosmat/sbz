@@ -1,0 +1,56 @@
+package rules.ads
+
+import model.Place
+import model.Post
+
+global repo.UserRepository  userRepo
+global repo.PostRepository  postRepo
+global repo.PlaceRepository placeRepo
+global repo.RatingRepository ratingRepo
+global java.time.LocalDateTime NOW
+
+dialect "java"
+
+// pomozna funkcija za toLowerCase bez NPE
+function String lc(String s) { return s == null ? "" : s.toLowerCase(); }
+
+query "Ads:ForTypeAndTag"( String $userId, String $city, String $typeKw, String $topicTag )
+
+    // Kandidat mesto: opis sadrži typeKw ILI hashtags sadrži "#typeKw",
+    // i uz to ima i topicTag (npr. #film) među svojim hashtagovima
+    $p : Place(
+        ( eval( lc(description).contains(lc($typeKw)) )
+          || hashtags contains ("#" + lc($typeKw)) ),
+        hashtags contains $topicTag,
+        eval( lc(city).equals(lc($city)) ) // isti grad
+    )
+
+    // >3 lajkovane objave sa topicTag
+    Number( $cntLiked : intValue ) from accumulate(
+        Post( $pid : id, hashtags contains $topicTag ),
+        init( int c = 0; ),
+        action( if ( postRepo.hasUserLiked($pid, $userId) ) { c++; } ),
+        result( c )
+    )
+    eval( $cntLiked > 3 )
+
+    // korisnik je i sam koristio taj hashtag u sopstvenim objavama (bar jednom)
+    Number( $cntUsed : intValue ) from accumulate(
+        Post( authorId == $userId, hashtags contains $topicTag ),
+        count(1)
+    )
+    eval( $cntUsed > 0 )
+
+    // pozitivan utisak o "tipu" – mapiramo na hešteg "#<typeKw>"
+    eval( ratingRepo.userHasPositiveRatingForType($userId, "#" + lc($typeKw)) )
+
+    // nije već ocenio konkretno mesto
+    eval( !ratingRepo.existsByUserAndPlace($userId, $p.getId()) )
+
+    // "why"
+    $why : String() from java.util.Collections.singletonList(
+        "preporuka: voli " + $typeKw +
+        ", " + $topicTag + " > 3 lajka, koristio " + $topicTag +
+        ", pozitivan utisak o " + $typeKw + ", grad: " + $city
+    )
+end

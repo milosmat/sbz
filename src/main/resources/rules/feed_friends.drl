@@ -13,7 +13,6 @@ global java.time.LocalDateTime NOW;
 global java.util.List friendsOut;
 
 dialect "java"
-
 // ===== VALIDACIJE =====
 rule "FeedFriends: userId prazan"
     salience 100

@@ -1,0 +1,20 @@
+.ads-wrapper { padding: 16px; }
+.state { margin: 16px 0; }
+.state.error { color: #b00020; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+.card-header { display: flex; flex-direction: column; gap: 4px; }
+.city { color: #6b7280; font-size: 13px; }
+.tags { margin: 8px 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { background: #f3f4f6; padding: 2px 8px; border-radius: 9999px; font-size: 12px; }
+.why { font-size: 14px; color: #374151; }
+.btn { margin-top: 8px; display: inline-block; }
