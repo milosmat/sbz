@@ -1,0 +1,35 @@
+package rules
+
+import dto.CreatePostRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+
+rule "PostCreate: userId prazan"
+    salience 100
+    agenda-group "post-create"
+when
+    $req : CreatePostRequest( authorId == null || authorId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani.");
+end
+
+rule "PostCreate: korisnik ne postoji"
+    agenda-group "post-create"
+when
+    $req : CreatePostRequest( authorId != null, eval( $req.authorId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.existsById($req.authorId) )
+then
+    $vr.add("Korisnik ne postoji.");
+end
+
+rule "PostCreate: tekst prazan"
+    agenda-group "post-create"
+when
+    $req : CreatePostRequest( text == null || text.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Tekst objave je obavezan.");
+end

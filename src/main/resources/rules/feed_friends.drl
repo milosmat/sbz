@@ -1,0 +1,52 @@
+package rules;
+
+import java.time.LocalDateTime;
+
+import dto.FriendFeedRequest;
+import dto.FriendIds;
+import dto.BlockedIds;
+import model.ValidationResult;
+import model.Post;
+
+global repo.UserRepository userRepo;
+global java.time.LocalDateTime NOW;
+global java.util.List friendsOut;
+
+dialect "java"
+
+// ===== VALIDACIJE =====
+rule "FeedFriends: userId prazan"
+    salience 100
+    agenda-group "feed-friends-validate"
+when
+    $req : FriendFeedRequest()
+    $vr  : ValidationResult()
+    eval( $req.getUserId() == null || $req.getUserId().trim().length() == 0 )
+then
+    $vr.add("Niste ulogovani (userId nedostaje).");
+end
+
+rule "FeedFriends: korisnik ne postoji"
+    agenda-group "feed-friends-validate"
+when
+    $req : FriendFeedRequest()
+    $vr  : ValidationResult()
+    eval( $req.getUserId() != null && $req.getUserId().trim().length() > 0 && !userRepo.existsById($req.getUserId()) )
+then
+    $vr.add("Korisnik ne postoji.");
+end
+
+// ===== SELEKCIJA =====
+// autor je prijatelj, nije blokiran, post <24h
+rule "Friends: select"
+    agenda-group "feed-friends-select"
+when
+    $friends : FriendIds( $fids : ids )
+    $blocked : BlockedIds( $bids : ids )
+    $p : Post()
+    eval( $p.getCreatedAt() != null && $p.getCreatedAt().isAfter(NOW.minusHours(24)) )
+    eval( $fids != null && $fids.contains($p.getAuthorId()) )
+    eval( $bids == null || !$bids.contains($p.getAuthorId()) )
+then
+    friendsOut.add($p);
+end

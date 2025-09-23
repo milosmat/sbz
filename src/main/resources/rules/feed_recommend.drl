@@ -1,0 +1,178 @@
+package rules;
+
+import java.time.LocalDateTime;
+
+import dto.CandidatePost;
+import dto.UserFeedContext;
+import dto.PopularHashtag;
+import dto.PopularPost;
+import dto.RecommendedFeedRequest;
+import dto.FriendIds;
+import dto.UserAuthoredCount;
+
+import model.ValidationResult;
+import model.Post;
+
+global repo.UserRepository userRepo;
+global java.time.LocalDateTime NOW;
+
+dialect "java"
+
+// marker tip za router – koristi se samo za "nije nov"
+declare UseBase end
+
+// ===== VALIDACIJE =====
+rule "FeedRecommend: userId prazan"
+    salience 100
+    agenda-group "feed-recommend-validate"
+when
+    $req : RecommendedFeedRequest()
+    $vr  : ValidationResult()
+    eval( $req.getUserId() == null || $req.getUserId().trim().length() == 0 )
+then
+    $vr.add("Niste ulogovani (userId nedostaje).");
+end
+
+rule "FeedRecommend: korisnik ne postoji"
+    agenda-group "feed-recommend-validate"
+when
+    $req : RecommendedFeedRequest()
+    $vr  : ValidationResult()
+    eval( $req.getUserId() != null && $req.getUserId().trim().length() > 0 && !userRepo.existsById($req.getUserId()) )
+then
+    $vr.add("Korisnik ne postoji.");
+end
+
+// ===== ROUTER =====
+// NIJE NOV: ima bar jednog prijatelja ILI bar jednu sopstvenu objavu → uključi BASE pravila
+rule "REC Router -> BASE (has friends OR has authored)"
+    salience 50
+    agenda-group "feed-recommend-router"
+when
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $cnt  : UserAuthoredCount()
+    eval( ($ids != null && !$ids.isEmpty()) || ($cnt.getCount() > 0) )
+then
+    insert( new UseBase() );
+end
+
+// ===== GUARDFILTER (zajedničko) =====
+// ne boduj prijatelje niti samog sebe
+rule "REC guard: friend/self"
+    salience 200
+    agenda-group "feed-recommend-score"
+when
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $c : CandidatePost( $p : post )
+    eval( $p != null && ( $p.getAuthorId().equals($req.getUserId())
+          || ($ids != null && $ids.contains($p.getAuthorId())) ) )
+then
+    // no-op
+end
+
+// ===== BASE (KORISNIK NIJE NOV) =====
+
+// R1: nov post (<24h), i nije friend/self
+rule "BASE R1: recent (<24h)"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseBase() )
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $c : CandidatePost( $p : post )
+    eval( $p != null
+          && !$p.getAuthorId().equals($req.getUserId())
+          && ($ids == null || !$ids.contains($p.getAuthorId()))
+          && $p.getCreatedAt() != null
+          && $p.getCreatedAt().isAfter(NOW.minusHours(24)) )
+then
+    $c.addScore(1, "nov post (<24h)");
+end
+
+// R2: korisnik lajkuje makar jedan hashtag iz posta
+rule "BASE R2: liked hashtag"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseBase() )
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $uc : UserFeedContext( $liked : likedHashtags )
+    $c  : CandidatePost( $p : post )
+    eval( $p != null
+          && !$p.getAuthorId().equals($req.getUserId())
+          && ($ids == null || !$ids.contains($p.getAuthorId())) )
+    exists( String( this memberOf $liked ) from $p.getHashtags() )
+then
+    $c.addScore(1, "lajkovani hešteg");
+end
+
+// R3: korisnik je autor postova sa tim hashtagom
+rule "BASE R3: authored hashtag"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseBase() )
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $uc : UserFeedContext( $auth : authoredHashtags )
+    $c  : CandidatePost( $p : post )
+    eval( $p != null
+          && !$p.getAuthorId().equals($req.getUserId())
+          && ($ids == null || !$ids.contains($p.getAuthorId())) )
+    exists( String( this memberOf $auth ) from $p.getHashtags() )
+then
+    $c.addScore(1, "autorski hešteg");
+end
+
+// R4: popularan post (24h + >10 lajkova)
+rule "BASE R4: popular post"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseBase() )
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $c : CandidatePost( $p : post )
+    eval( $p != null
+          && !$p.getAuthorId().equals($req.getUserId())
+          && ($ids == null || !$ids.contains($p.getAuthorId())) )
+    PopularPost( postId == $p.id )
+then
+    $c.addScore(1, "popularan post");
+end
+
+// R5: popularan hešteg (>5 objava u 24h)
+rule "BASE R5: popular hashtag"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseBase() )
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $c  : CandidatePost( $p : post )
+    eval( $p != null
+          && !$p.getAuthorId().equals($req.getUserId())
+          && ($ids == null || !$ids.contains($p.getAuthorId())) )
+    $ph : PopularHashtag( $tag : tag )
+    String( this == $tag ) from $p.getHashtags()
+then
+    $c.addScore(1, "popularan hešteg");
+end
+
+// R6: boost – popularan hešteg i korisnik lajkuje taj hešteg
+rule "BASE R6: boost (popular & liked hashtag)"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseBase() )
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $uc : UserFeedContext( $liked : likedHashtags )
+    $c  : CandidatePost( $p : post )
+    eval( $p != null
+          && !$p.getAuthorId().equals($req.getUserId())
+          && ($ids == null || !$ids.contains($p.getAuthorId())) )
+    $ph : PopularHashtag( $tag : tag )
+    String( this == $tag ) from $p.getHashtags()
+    eval( $liked.contains($tag) )
+then
+    $c.addScore(1, "boost: popularan & lajkovan hešteg");
+end

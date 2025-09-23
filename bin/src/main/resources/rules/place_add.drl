@@ -1,0 +1,65 @@
+package rules
+
+import dto.CreatePlaceRequest;
+import model.ValidationResult;
+
+global repo.UserRepository userRepo;
+global repo.PlaceRepository placeRepo;
+
+rule "PlaceAdd: adminId prazan"
+    salience 100
+    agenda-group "place-add"
+when
+    $req : CreatePlaceRequest( adminId == null || adminId.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Niste ulogovani.");
+end
+
+rule "PlaceAdd: nije admin"
+    agenda-group "place-add"
+when
+    $req : CreatePlaceRequest( adminId != null, eval( $req.adminId.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( !userRepo.isAdmin($req.adminId) )
+then
+    $vr.add("Samo administrator može da dodaje mesta.");
+end
+
+rule "PlaceAdd: naziv prazan"
+    agenda-group "place-add"
+when
+    $req : CreatePlaceRequest( name == null || name.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Naziv je obavezan.");
+end
+
+rule "PlaceAdd: drzava prazna"
+    agenda-group "place-add"
+when
+    $req : CreatePlaceRequest( country == null || country.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Država je obavezna.");
+end
+
+rule "PlaceAdd: grad prazan"
+    agenda-group "place-add"
+when
+    $req : CreatePlaceRequest( city == null || city.trim().length() == 0 )
+    $vr  : ValidationResult()
+then
+    $vr.add("Grad je obavezan.");
+end
+
+rule "PlaceAdd: duplikat (naziv+grad)"
+    agenda-group "place-add"
+when
+    $req : CreatePlaceRequest( name != null, city != null,
+                               eval( $req.name.trim().length() > 0 && $req.city.trim().length() > 0 ) )
+    $vr  : ValidationResult()
+    eval( placeRepo.existsByNameAndCity($req.name, $req.city) )
+then
+    $vr.add("Mesto sa istim nazivom u tom gradu već postoji.");
+end
