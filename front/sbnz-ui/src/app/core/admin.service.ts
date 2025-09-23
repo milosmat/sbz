@@ -2,6 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/evnironment.development';
+import {Flagged} from './models/moderation';
 
 export interface FlagDTO {
   userId: string;
@@ -24,4 +25,6 @@ export class AdminService {
       .set('limit', limit);
     return this.http.get<FlagDTO[]>(`${this.base}/mod/flags`, { params });
   }
+
+  detectBadUsers() { return this.http.post<Flagged[]>(`${this.base}/detect`, {}); }
 }

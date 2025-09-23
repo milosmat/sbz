@@ -10,8 +10,8 @@ export const routes: Routes = [
       { path: 'new', loadComponent: () => import('./pages/new-post/new-post.component').then(m => m.NewPostComponent) },
       { path: 'friends/search', loadComponent: () => import('./pages/friends-search/friends-search.component').then(m => m.FriendsSearchComponent) },
       { path: 'places/new', loadComponent: () => import('./pages/new-place/new-place.component').then(m => m.NewPlaceComponent) },
-      { path: '', redirectTo: 'feed', pathMatch: 'full' },
       { path: 'feed', loadComponent: () => import('./pages/feed/feed.component').then(m => m.FeedComponent) }
+      { path: 'admin/moderation', loadComponent: () => import('./pages/admin-moderation/admin-moderation.component').then(m => m.AdminModerationComponent) },
     ]
   },
   { path: '**', redirectTo: '' }
