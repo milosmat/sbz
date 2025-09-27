@@ -206,6 +206,45 @@ public class PostRepository {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    // --- NEW: helpers for similarity / preferences ---
+    /** Users who liked a given post */
+    public Set<String> findUsersWhoLikedPost(String postId) {
+        String sql = "SELECT user_id FROM post_likes WHERE post_id=?";
+        Set<String> out = new HashSet<>();
+        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, java.util.UUID.fromString(postId));
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.add(rs.getObject(1, java.util.UUID.class).toString()); }
+            return out;
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    /** Posts liked by given user since a timestamp */
+    public Set<String> findPostsLikedByUserSince(String userId, LocalDateTime since) {
+        String sql = "SELECT post_id FROM post_likes l JOIN posts p ON p.id=l.post_id WHERE l.user_id=? AND p.created_at>=?";
+        Set<String> out = new HashSet<>();
+        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, java.util.UUID.fromString(userId));
+            ps.setTimestamp(2, Timestamp.valueOf(since));
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.add(rs.getObject(1, java.util.UUID.class).toString()); }
+            return out;
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
+    /** Hashtags for a post */
+    public Set<String> getHashtagsForPost(String postId) {
+        String sql = "SELECT hashtags FROM posts WHERE id=?";
+        try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setObject(1, java.util.UUID.fromString(postId));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return java.util.Collections.emptySet();
+                java.sql.Array a = rs.getArray(1);
+                java.util.Set<String> tags = new java.util.HashSet<>();
+                if (a != null) tags.addAll(java.util.Arrays.asList((String[]) a.getArray()));
+                return tags;
+            }
+        } catch (SQLException e) { throw new RuntimeException(e); }
+    }
+
     public int countByAuthor(String authorId) {
         String sql = "SELECT COUNT(*) FROM posts WHERE author_id=?";
         try (Connection c = Db.get(); PreparedStatement ps = c.prepareStatement(sql)) {

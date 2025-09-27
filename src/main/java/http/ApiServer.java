@@ -89,6 +89,13 @@ public static class RecDTO {
         HttpServer s = HttpServer.create(new InetSocketAddress(port), 0);
         s.setExecutor(Executors.newFixedThreadPool(8));
         
+        // Health check
+        s.createContext("/api/health", Cors.wrap(ex -> {
+            if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
+            if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
+            ok(ex, map("status", "ok"));
+        }));
+        
         s.createContext("/api/auth/login", Cors.wrap(ex -> {
             if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
             if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
@@ -463,26 +470,22 @@ public static class RecDTO {
             }
         }));
         
-        // preporuceni feed
+        // preporuceni feed (koristi Bearer token za identitet)
         s.createContext("/api/feed/recommended", Cors.wrap(ex -> {
             if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { Cors.handlePreflight(ex); return; }
             if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) { methodNotAllowed(ex); return; }
 
-            Map<String,List<String>> q = Query.params(ex);
-            String userId = Query.str(q, "userId", null);
-            int limit = (int) Query.num(q, "limit", 20);
+            Optional<String> uid = requireAuth(ex);
+            if (!uid.isPresent()) return;
 
-            if (userId == null || userId.trim().isEmpty()) {
-                badRequest(ex, "userId is required");
-                return;
-            }
+            Map<String,List<String>> q = Query.params(ex);
+            int limit = (int) Query.num(q, "limit", 20);
 
             try {
                 java.time.LocalDateTime now = java.time.LocalDateTime.now();
-                java.util.List<dto.CandidatePost> recs = feedService.recommendedFeed(userId, now, limit);
-          
-                java.util.List<RecDTO> out = new java.util.ArrayList<>();
+                java.util.List<dto.CandidatePost> recs = feedService.recommendedFeed(uid.get(), now, limit);
 
+                java.util.List<RecDTO> out = new java.util.ArrayList<>();
                 if (recs != null) {
                     for (dto.CandidatePost c : recs) {
                         if (c == null || c.getPost() == null) continue;

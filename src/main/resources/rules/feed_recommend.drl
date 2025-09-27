@@ -9,6 +9,10 @@ import dto.PopularPost;
 import dto.RecommendedFeedRequest;
 import dto.FriendIds;
 import dto.UserAuthoredCount;
+import dto.SimilarUser;
+import dto.PostLikers;
+import dto.UserLikedPosts;
+import dto.UserPreferredTag;
 
 import model.ValidationResult;
 import model.Post;
@@ -20,6 +24,8 @@ dialect "java"
 
 // marker tip za router – koristi se samo za "nije nov"
 declare UseBase end
+// marker tip za router – korisnik je nov
+declare UseNew end
 
 // ===== VALIDACIJE =====
 rule "FeedRecommend: userId prazan"
@@ -57,6 +63,19 @@ then
     insert( new UseBase() );
 end
 
+// NEW: korisnik je nov (nema prijatelje i nema svoje objave)
+rule "REC Router -> NEW (no friends AND no authored)"
+    salience 40
+    agenda-group "feed-recommend-router"
+when
+    $req  : RecommendedFeedRequest()
+    $fids : FriendIds( $ids : ids )
+    $cnt  : UserAuthoredCount( $c : count )
+    eval( ($ids == null || $ids.isEmpty()) && ($c == 0) )
+then
+    insert( new UseNew() );
+end
+
 // ===== GUARDFILTER (zajedničko) =====
 // ne boduj prijatelje niti samog sebe
 rule "REC guard: friend/self"
@@ -69,7 +88,8 @@ when
     eval( $p != null && ( $p.getAuthorId().equals($req.getUserId())
           || ($ids != null && $ids.contains($p.getAuthorId())) ) )
 then
-    // no-op
+    // ukloni kandidate koji su od prijatelja ili samog korisnika
+    delete($c);
 end
 
 // ===== BASE (KORISNIK NIJE NOV) =====
@@ -89,6 +109,60 @@ when
           && $p.getCreatedAt().isAfter(NOW.minusHours(24)) )
 then
     $c.addScore(1, "nov post (<24h)");
+end
+
+// ===== Helpers (NEW) =====
+// overlap(A,B) = |A∩B| / |A|  (ako je A prazno, 0)
+function double overlap(java.util.Set a, java.util.Set b){
+    if (a == null || b == null || a.isEmpty()) return 0d;
+    java.util.HashSet s = new java.util.HashSet(a);
+    s.retainAll(b);
+    return ((double) s.size()) / ((double) a.size());
+}
+
+// ===== NEW (KORISNIK JE NOV) =====
+
+// N1: post je lajkovao sličan korisnik (Pearson >= 0.5)
+rule "NEW N1: liked by similar user"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseNew() )
+    $req : RecommendedFeedRequest( $uid : userId )
+    $c   : CandidatePost( $p : post )
+    $su  : SimilarUser( baseUserId == $uid, $other : otherUserId, score >= 0.5 )
+    $pl  : PostLikers( postId == $p.id )
+    eval( $pl.getUserIds() != null && $pl.getUserIds().contains($other) )
+then
+    $c.addScore(1, "sličan korisnik lajkovao");
+end
+
+// N2: post je sličan postu koji se dopao korisniku (>=70% likera preseka)
+rule "NEW N2: similar to liked post"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseNew() )
+    $req : RecommendedFeedRequest( $uid : userId )
+    $c   : CandidatePost( $p : post )
+    $plC : PostLikers( postId == $p.id, $likersC : userIds )
+    $ulp : UserLikedPosts( userId == $uid, $likedPosts : postIds )
+    $plL : PostLikers( $likersL : userIds )
+    eval( $likedPosts != null && $likedPosts.contains($plL.getPostId()) )
+    eval( overlap($likersC, $likersL) >= 0.7 )
+then
+    $c.addScore(1, "slično lajkovanim objavama");
+end
+
+// N3: post odgovara preferencama korisnika (tag sa >=3 lajka u 3 dana)
+rule "NEW N3: matches user preferences"
+    agenda-group "feed-recommend-score"
+when
+    exists( UseNew() )
+    $req : RecommendedFeedRequest( $uid : userId )
+    $c   : CandidatePost( $p : post )
+    $pref: UserPreferredTag( userId == $uid, $tag : tag, count >= 3 )
+    String( this == $tag ) from $p.getHashtags()
+then
+    $c.addScore(1, "preferencija: " + $tag);
 end
 
 // R2: korisnik lajkuje makar jedan hashtag iz posta

@@ -29,18 +29,16 @@ public class SeedSuspiciousUsersTest {
         mr  = ModerationEventsRepository.getInstance();
         mod = new ModerationService(ur, mr);
 
-        // === KREIRANJE KORISNIKA PREKO REGISTER SERVISA (kao ensureAdminSeed) ===
-        RegistrationService reg = new RegistrationService(ur); // prilagodi konstruktor ako traži još dependencija
-
-        User victim1  = reg.register(new RegisterRequest("V1", "User", "v1@gmail.com", "secret1", "BG"));
-        User victim2  = reg.register(new RegisterRequest("V2", "User", "v2@gmail.com", "secret1", "NS"));
-        User victim3  = reg.register(new RegisterRequest("V3", "User", "v3@gmail.com", "secret1", "NS")); // combo
-        User victim4  = reg.register(new RegisterRequest("V4", "User", "v4@gmail.com", "secret1", "BG")); // 3 bloka/12h
-        User reporter = reg.register(new RegisterRequest("R",  "User", "reporter@gmail.com", "secret1", "BG"));
-        User b1       = reg.register(new RegisterRequest("B1", "User", "b1@gmail.com", "secret1", "BG"));
-        User b2       = reg.register(new RegisterRequest("B2", "User", "b2@gmail.com", "secret1", "BG"));
-        User b3       = reg.register(new RegisterRequest("B3", "User", "b3@gmail.com", "secret1", "BG"));
-        User b4       = reg.register(new RegisterRequest("B4", "User", "b4@gmail.com", "secret1", "BG"));
+        RegistrationService reg = new RegistrationService(ur);
+        User victim1 = reg.register(new RegisterRequest("V1", "User", "v1@gmail.com", "secret1", "BG"));
+        User victim2 = reg.register(new RegisterRequest("V2", "User", "v2@gmail.com", "secret1", "NS"));
+        User victim3 = reg.register(new RegisterRequest("V3", "User", "v3@gmail.com", "secret1", "NS")); // combo
+        User victim4 = reg.register(new RegisterRequest("V4", "User", "v4@gmail.com", "secret1", "BG")); // 3 bloka/12h
+        User reporter = reg.register(new RegisterRequest("R", "User", "reporter@gmail.com", "secret1", "BG"));
+        User b1 = reg.register(new RegisterRequest("B1", "User", "b1@gmail.com", "secret1", "BG"));
+        User b2 = reg.register(new RegisterRequest("B2", "User", "b2@gmail.com", "secret1", "BG"));
+        User b3 = reg.register(new RegisterRequest("B3", "User", "b3@gmail.com", "secret1", "BG"));
+        User b4 = reg.register(new RegisterRequest("B4", "User", "b4@gmail.com", "secret1", "BG"));
 
         User r1u = reg.register(new RegisterRequest("R1", "Case", "r1@sbz.com", "secret1", "BG")); // R1: 5+ reports/24h
         User r2u = reg.register(new RegisterRequest("R2", "Case", "r2@sbz.com", "secret1", "BG")); // R2: 8+ reports/48h (izvan 24h)
@@ -50,12 +48,12 @@ public class SeedSuspiciousUsersTest {
         User r6u = reg.register(new RegisterRequest("R6", "Case", "r6@sbz.com", "secret1", "BG")); // R6: 10+ reports/7d
 
         // EDGE/NEGATIVE (ne bi smeli da trigeruju)
-        User eR1  = reg.register(new RegisterRequest("E1", "Edge", "e1@sbz.com", "secret1", "BG")); // tačno 5 prijava/24h -> NO
-        User eR2  = reg.register(new RegisterRequest("E2", "Edge", "e2@sbz.com", "secret1", "BG")); // tačno 8 prijava/48h (0 u 24h) -> NO
-        User eR3  = reg.register(new RegisterRequest("E3", "Edge", "e3@sbz.com", "secret1", "BG")); // tačno 4 bloka/24h -> NO
-        User eR4a = reg.register(new RegisterRequest("E4a","Edge", "e4a@sbz.com","secret1","BG")); // 2 blocks/48h + 5 reports/24h -> NO (blocks nisu >2)
-        User eR4b = reg.register(new RegisterRequest("E4b","Edge", "e4b@sbz.com","secret1","BG")); // 3 blocks/48h + 4 reports/24h -> NO (reports nisu >4)
-        User eR5  = reg.register(new RegisterRequest("E5", "Edge", "e5@sbz.com", "secret1", "BG")); // 2 bloka/12h -> NO
+        User eR1 = reg.register(new RegisterRequest("E1", "Edge", "e1@sbz.com", "secret1", "BG")); // tačno 5 prijava/24h -> NO
+        User eR2 = reg.register(new RegisterRequest("E2", "Edge", "e2@sbz.com", "secret1", "BG")); // tačno 8 prijava/48h (0 u 24h) -> NO
+        User eR3 = reg.register(new RegisterRequest("E3", "Edge", "e3@sbz.com", "secret1", "BG")); // tačno 4 bloka/24h -> NO
+        User eR4a = reg.register(new RegisterRequest("E4a", "Edge", "e4a@sbz.com", "secret1", "BG")); // 2 blocks/48h + 5 reports/24h -> NO (blocks nisu >2)
+        User eR4b = reg.register(new RegisterRequest("E4b", "Edge", "e4b@sbz.com", "secret1", "BG")); // 3 blocks/48h + 4 reports/24h -> NO (reports nisu >4)
+        User eR5 = reg.register(new RegisterRequest("E5", "Edge", "e5@sbz.com", "secret1", "BG")); // 2 bloka/12h -> NO
         User clean = reg.register(new RegisterRequest("CL", "Clean","clean@sbz.com","secret1","BG")); // bez događaja
 
         // dodatni "blocker" nalozi da možemo 5+ blokova
@@ -65,7 +63,7 @@ public class SeedSuspiciousUsersTest {
         User b8 = reg.register(new RegisterRequest("B8","User","b8@gmail.com","secret1","BG"));
         
         long now = System.currentTimeMillis();
-        long H   = 3_600_000L;
+        long H = 3_600_000L;
 
      // ===== R1: >5 prijava u 24h (npr. 6 u poslednjih 60 minuta) -> post ban 24h
         for (int i = 0; i < 6; i++) {
@@ -100,7 +98,6 @@ public class SeedSuspiciousUsersTest {
         mr.recordBlockAt(b3.getId(), r5u.getId(), now - 1L * H);
 
         // ===== R6: 10+ prijava u 7 dana -> login ban 72h
-        // rasporedi 11 prijava u poslednjih ~6 dana bez koncentracije >5 u 24h
         for (int i = 0; i < 11; i++) {
             long ts = now - (150L * 60L * 60L * 1000L) + i * (15L * 60L * 60L * 1000L); // od ~-150h, korak 15h
             // osiguraj da je unutar 7d (168h)
@@ -109,7 +106,7 @@ public class SeedSuspiciousUsersTest {
             }
         }
 
-        // ===== EDGE/NEGATIVE slučajevi =====
+        // ===== EDGE slučajevi =====
 
         // eR1: TAČNO 5 prijava u 24h -> NE treba da trigeruje (jer pravilo je >5)
         for (int i = 0; i < 5; i++) {

@@ -196,6 +196,45 @@ public class FeedService {
             ks.insert(new UserAuthoredCount(userId, authoredCount));
             ks.insert(new UserFeedContext(userId, now, likedTags, authoredTags));
 
+            // ===== NEW-user data provisioning =====
+            // 1) UserLikedPosts: sve postove koje je korisnik lajkovao u proteklih 30 dana
+            Set<String> likedPostsByUser = postRepo.findPostsLikedByUserSince(userId, now.minusDays(30));
+            ks.insert(new dto.UserLikedPosts(userId, likedPostsByUser));
+
+            // 2) UserPreferredTag: broj ponavljanja tagova iz tih lajkovanih postova u poslednja 3 dana
+            Map<String,Integer> likeCntByTag = new HashMap<>();
+            for (String pid : likedPostsByUser) {
+                // uzmi tagove sa posta i broji
+                for (String tag : postRepo.getHashtagsForPost(pid)) {
+                    likeCntByTag.merge(tag, 1, Integer::sum);
+                }
+                // ubaci i likere za svaki user-om lajkovan post (za N2 sličnost postova)
+                try {
+                    java.util.Set<String> likers = postRepo.findUsersWhoLikedPost(pid);
+                    ks.insert(new dto.PostLikers(pid, likers));
+                } catch (Exception ignore) { }
+            }
+            likeCntByTag.forEach((tag,cnt) -> ks.insert(new UserPreferredTag(userId, tag, cnt)));
+
+            // 3) SimilarUser: uprostena sličnost (Jaccard) na osnovu lajkovanih postova u 30 dana
+            try {
+                java.util.Collection<model.User> allUsers = userRepo.findAll();
+                for (model.User other : allUsers) {
+                    if (other == null) continue;
+                    if (userId.equals(other.getId())) continue;
+                    java.util.Set<String> otherLiked = postRepo.findPostsLikedByUserSince(other.getId(), now.minusDays(30));
+                    java.util.Set<String> union = new java.util.HashSet<>(likedPostsByUser);
+                    union.addAll(otherLiked);
+                    if (union.isEmpty()) continue;
+                    java.util.Set<String> inter = new java.util.HashSet<>(likedPostsByUser);
+                    inter.retainAll(otherLiked);
+                    double score = (double) inter.size() / (double) union.size();
+                    if (score >= 0.5) {
+                        ks.insert(new dto.SimilarUser(userId, other.getId(), score));
+                    }
+                }
+            } catch (Exception ignore) { }
+
             // popular (24h)
             LocalDateTime last24h = now.minusHours(24);
             Map<String,Integer> ht24 = postRepo.countHashtagUsageSince(last24h);
@@ -213,6 +252,11 @@ public class FeedService {
                     ks.insert(new PopularPost(p.getId()));
                 }
                 ks.insert(new CandidatePost(p));
+                // likers za post (za pravila N1/N2)
+                try {
+                    java.util.Set<String> likers = postRepo.findUsersWhoLikedPost(p.getId());
+                    ks.insert(new dto.PostLikers(p.getId(), likers));
+                } catch (Exception ignore) { }
             }
 
             int fired = ks.fireAllRules();

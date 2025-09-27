@@ -9,46 +9,81 @@ global repo.PlaceRepository placeRepo
 global repo.RatingRepository ratingRepo
 global java.time.LocalDateTime NOW
 
+// i dalje deklarisani da setGlobal ne puca, iako ih upit ne koristi
+global String ADS_USER_ID
+global String ADS_CITY
+global String ADS_TYPE_KW
+global String ADS_TOPIC_TAG
+
 dialect "java"
 
-// pomozna funkcija za toLowerCase bez NPE
+// ---------- Helpers ----------
 function String lc(String s) { return s == null ? "" : s.toLowerCase(); }
 
-query "Ads:ForTypeAndTag"( String $userId, String $city, String $typeKw, String $topicTag )
+function boolean containsTagIC(java.util.Collection tags, String tag) {
+    if (tags == null || tag == null) return false;
+    String needle = lc(tag);
+    for (Object o : tags) {
+        if (o != null && lc(o.toString()).equals(needle)) return true;
+    }
+    return false;
+}
 
-    // Kandidat mesto: opis sadrži typeKw ILI hashtags sadrži "#typeKw",
-    // i uz to ima i topicTag (npr. #film) među svojim hashtagovima
-    $p : Place(
-        ( eval( lc(description).contains(lc($typeKw)) )
-          || hashtags contains ("#" + lc($typeKw)) ),
-        hashtags contains $topicTag,
-        eval( lc(city).equals(lc($city)) ) // isti grad
-    )
+function boolean anyTagContainsIC(java.util.Collection tags, String sub) {
+    if (tags == null || sub == null) return false;
+    String needle = lc(sub);
+    for (Object o : tags) {
+        if (o != null && lc(o.toString()).contains(needle)) return true;
+    }
+    return false;
+}
 
-    // >3 lajkovane objave sa topicTag
-    Number( $cntLiked : intValue ) from accumulate(
-        Post( $pid : id, hashtags contains $topicTag ),
+// ---------- Query-je koje koristimo u kompoziciji ----------
+query "UserLikedEnoughForTag"( String $userId, String $topicTag )
+    Number( $cnt : intValue ) from accumulate(
+        Post( $pid : id, eval( containsTagIC(hashtags, $topicTag) ) ),
         init( int c = 0; ),
         action( if ( postRepo.hasUserLiked($pid, $userId) ) { c++; } ),
         result( c )
     )
-    eval( $cntLiked > 3 )
+    eval( $cnt > 3 )
+end
 
-    // korisnik je i sam koristio taj hashtag u sopstvenim objavama (bar jednom)
-    Number( $cntUsed : intValue ) from accumulate(
-        Post( authorId == $userId, hashtags contains $topicTag ),
+query "UserAuthoredUsedTag"( String $userId, String $topicTag )
+    Number( $cnt : intValue ) from accumulate(
+        Post( authorId == $userId, eval( containsTagIC(hashtags, $topicTag) ) ),
         count(1)
     )
-    eval( $cntUsed > 0 )
+    eval( $cnt > 0 )
+end
 
-    // pozitivan utisak o "tipu" – mapiramo na hešteg "#<typeKw>"
+query "UserHasPositiveType"( String $userId, String $typeKw )
     eval( ratingRepo.userHasPositiveRatingForType($userId, "#" + lc($typeKw)) )
+end
 
-    // nije već ocenio konkretno mesto
+query "NotAlreadyRated"( String $userId, Place $p )
     eval( !ratingRepo.existsByUserAndPlace($userId, $p.getId()) )
+end
 
-    // "why"
-    $why : String() from java.util.Collections.singletonList(
+// ---------- Glavni upit: čist backward-chaining, bez pravila ----------
+query "Ads:ForTypeAndTag"( String $userId, String $city, String $typeKw, String $topicTag )
+    $p : Place(
+        // type match: opis sadrži typeKw ILI hešteg "#typeKw"
+        ( eval( lc(description).contains(lc($typeKw)) )
+          || eval( containsTagIC(hashtags, "#" + $typeKw) ) ),
+        // tematski tag
+        eval( containsTagIC(hashtags, $topicTag) ),
+        // grad
+        eval( lc(city).equals(lc($city)) )
+    )
+    // ugnježdene provere
+    UserLikedEnoughForTag( $userId, $topicTag; )
+    UserAuthoredUsedTag(  $userId, $topicTag; )
+    UserHasPositiveType(  $userId, $typeKw;   )
+    NotAlreadyRated(      $userId, $p;        )
+
+    // objasni-zašto kao izlazna promenljiva
+    $why : String() from (
         "preporuka: voli " + $typeKw +
         ", " + $topicTag + " > 3 lajka, koristio " + $topicTag +
         ", pozitivan utisak o " + $typeKw + ", grad: " + $city

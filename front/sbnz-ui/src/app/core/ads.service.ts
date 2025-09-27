@@ -15,12 +15,12 @@ export interface AdDTO {
 
 @Injectable({ providedIn: 'root' })
 export class AdsService {
-  private baseUrl = '/api/ads';
+  private baseUrl = `${environment.apiUrl}/ads`;
 
   constructor(private http: HttpClient) {}
 
   getRecommended(limit = 20): Observable<AdDTO[]> {
     const params = new HttpParams().set('limit', String(limit));
-    return this.http.get<AdDTO[]>(`${environment.apiUrl}/ads/recommended`, { params, withCredentials: true });
+    return this.http.get<AdDTO[]>(`${this.baseUrl}/recommended`, { params, withCredentials: true });
   }
 }

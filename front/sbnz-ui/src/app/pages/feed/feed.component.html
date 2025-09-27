@@ -18,6 +18,10 @@
     </div>
     <div class="text">{{ p.text }}</div>
     <div class="tags" *ngIf="p.hashtags?.length">{{ tagsJoin(p.hashtags) }}</div>
+    <div class="actions">
+      <button (click)="likeFriend(p)">Like</button>
+      <button class="ghost" (click)="reportFriend(p)">Prijavi</button>
+    </div>
   </article>
 
   <div class="pager" *ngIf="friends.length < friendsTotal && !friendsLoading">
@@ -54,6 +58,10 @@
             {{ why }}
           </li>
         </ul>
+      </div>
+      <div class="actions">
+        <button (click)="likeRec(r)">Like</button>
+        <button class="ghost" (click)="reportRec(r)">Prijavi</button>
       </div>
     </article>
   </ng-container>

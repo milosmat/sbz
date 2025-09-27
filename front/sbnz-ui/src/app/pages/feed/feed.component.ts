@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FeedApiService, Page, PostDTO, RecDTO } from '../../core/feed-api.service';
+import { PostService } from '../../core/post.service';
+import { Post } from '../../core/models/post';
 import {RecommendedAdsComponent} from '../recommended-ads/recommended-ads.component';
 
 @Component({
@@ -34,17 +36,21 @@ export class FeedComponent implements OnInit {
     'popularan hešteg': 3,
     'lajkovani hešteg': 4,
     'autorski hešteg': 5,
-    'nov post (<24h)': 6
+    'nov post (<24h)': 6,
+    // NEW-user reasons
+    'sličan korisnik lajkovao': 7,
+    'slično lajkovanim objavama': 8,
+    'preferencija': 9
   };
 
-  constructor(private api: FeedApiService) {}
+  constructor(private api: FeedApiService, private postsApi: PostService) {}
 
   ngOnInit(): void {
     // auth servis postavlja 'token' i 'uid' u localStorage (interceptor šalje Bearer)
     this.userId = localStorage.getItem('uid');
     if (this.userId) {
       this.loadFriends(true);
-      this.loadRecommended();
+  this.loadRecommended();
     } else {
       this.friends = [];
       this.recs = [];
@@ -53,7 +59,7 @@ export class FeedComponent implements OnInit {
 
   // Helpers
   toDate(ms: number): Date { return new Date(ms); }
-  tagsJoin(tags?: string[]): string { return (tags ?? []).map(t => `#${t}`).join(' '); }
+  tagsJoin(tags?: string[]): string { return (tags ?? []).join(' '); }
   isBoost(why: string): boolean { return why?.toLowerCase().startsWith('boost'); }
 
   trackPostId = (_: number, p: PostDTO) => p?.id;
@@ -80,12 +86,38 @@ export class FeedComponent implements OnInit {
     });
   }
 
+  // Actions: Friends feed
+  likeFriend(p: PostDTO): void {
+    if (!p?.id) return;
+    this.postsApi.like(p.id).subscribe({
+      next: (updated) => this.applyFriendUpdate(updated),
+      error: (err) => { this.friendsError = err?.error?.error ?? 'Greška pri lajku.'; }
+    });
+  }
+
+  reportFriend(p: PostDTO): void {
+    if (!p?.id) return;
+    const reason = prompt('Razlog (opciono):') || '';
+    this.postsApi.report(p.id, reason).subscribe({
+      next: (updated: any) => {
+        // backend vraća ažuriran post; ako ne, fallback bez promene
+        if (updated && updated.id) this.applyFriendUpdate(updated as Post);
+      },
+      error: (err) => { this.friendsError = err?.error?.error ?? 'Greška pri prijavi.'; }
+    });
+  }
+
+  private applyFriendUpdate(updated: Post): void {
+    const i = this.friends.findIndex(x => x.id === updated.id);
+    if (i >= 0) this.friends[i] = this.asDto(updated);
+  }
+
   // Recommended
   loadRecommended(limit = 20): void {
-    if (!this.userId || this.recLoading) { this.recs = []; return; }
+    if (this.recLoading) { return; }
     this.recLoading = true; this.recError = null;
 
-    this.api.getRecommended(this.userId, limit).subscribe({
+    this.api.getRecommended(limit).subscribe({
       next: (list) => {
         const cleaned = (list ?? []).filter(r => !!r && !!r.post);
         // unikatni razlozi + sort po prioritetu
@@ -101,5 +133,44 @@ export class FeedComponent implements OnInit {
         this.recLoading = false;
       }
     });
+  }
+
+  // Actions: Recommended feed
+  likeRec(r: RecDTO): void {
+    const id = r?.post?.id;
+    if (!id) return;
+    this.postsApi.like(id).subscribe({
+      next: (updated) => this.applyRecUpdate(updated, r),
+      error: (err) => { this.recError = err?.error?.error ?? 'Greška pri lajku.'; }
+    });
+  }
+
+  reportRec(r: RecDTO): void {
+    const id = r?.post?.id;
+    if (!id) return;
+    const reason = prompt('Razlog (opciono):') || '';
+    this.postsApi.report(id, reason).subscribe({
+      next: (updated: any) => { if (updated && updated.id) this.applyRecUpdate(updated as Post, r); },
+      error: (err) => { this.recError = err?.error?.error ?? 'Greška pri prijavi.'; }
+    });
+  }
+
+  private applyRecUpdate(updated: Post, rec: RecDTO): void {
+    if (!rec || !rec.post) return;
+    rec.post = this.asDto(updated);
+    // trigger change detection by reassigning array (immutability)
+    this.recs = this.recs.map(x => x === rec ? { ...rec } : x);
+  }
+
+  private asDto(p: Post | PostDTO): PostDTO {
+    return {
+      id: p.id,
+      authorId: p.authorId,
+      text: p.text,
+      hashtags: (p as any).hashtags ?? [],
+      likes: (p as any).likes ?? 0,
+      reports: (p as any).reports ?? 0,
+      createdAtEpochMs: (p as any).createdAtEpochMs ?? 0,
+    };
   }
 }

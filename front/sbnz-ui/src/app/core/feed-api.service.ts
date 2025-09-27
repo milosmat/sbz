@@ -18,14 +18,14 @@ export class FeedApiService {
 
   constructor(private http: HttpClient) {}
 
-  getFriendsFeed(userId: string, days = 1, page = 0, size = 20): Observable<Page<PostDTO>> {
-    const params = new HttpParams()
-      .set('userId', userId).set('days', days).set('page', page).set('size', size);
+  // Backend koristi token za identitet; userId/days nisu potrebni u query-ju
+  getFriendsFeed(_userId: string, _days = 1, page = 0, size = 20): Observable<Page<PostDTO>> {
+    const params = new HttpParams().set('page', page).set('size', size);
     return this.http.get<Page<PostDTO>>(`${this.feedBase}/friends`, { params });
   }
 
-  getRecommended(userId: string, limit = 20): Observable<RecDTO[]> {
-    const params = new HttpParams().set('userId', userId).set('limit', limit);
+  getRecommended(limit = 20): Observable<RecDTO[]> {
+    const params = new HttpParams().set('limit', limit);
     return this.http.get<RecDTO[]>(`${environment.apiUrl}/feed/recommended`, { params });
   }
 
